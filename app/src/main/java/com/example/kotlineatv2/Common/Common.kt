@@ -12,6 +12,7 @@ import java.lang.StringBuilder
 import java.lang.reflect.Type
 import java.math.RoundingMode
 import java.text.DecimalFormat
+import kotlin.random.Random
 
 object Common {
     fun formatPrice(price: Double): String {
@@ -69,6 +70,15 @@ object Common {
 
     }
 
+    fun createOrderNumber(): String {
+        return StringBuilder()
+            .append(System.currentTimeMillis())
+            .append(Math.abs(Random.nextInt()))
+            .toString()
+
+    }
+
+    val ORDER_REFERENCE: String = "Order"
     val COMMENT_REFERENCE: String = "Comments"
     val USER_REFERENCE:String = "Users"
     var currentUser:UserModel? = null

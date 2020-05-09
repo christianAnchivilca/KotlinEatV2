@@ -26,9 +26,11 @@ import com.example.kotlineatv2.Database.LocalCartDataSource
 import com.example.kotlineatv2.EventBus.CounterCartEvent
 import com.example.kotlineatv2.EventBus.HidenFABCart
 import com.example.kotlineatv2.EventBus.UpdateItemInCart
+import com.example.kotlineatv2.Model.OrderModel
 import com.example.kotlineatv2.R
 import com.google.android.gms.location.*
 import com.google.android.material.button.MaterialButton
+import com.google.firebase.database.FirebaseDatabase
 import io.reactivex.Single
 import io.reactivex.SingleObserver
 import io.reactivex.android.schedulers.AndroidSchedulers
@@ -46,6 +48,7 @@ import java.lang.StringBuilder
 import java.util.*
 
 class CartFragment : Fragment() {
+
 
     private var cartDataSource:CartDataSource? = null
     private var compositeDisposable:CompositeDisposable = CompositeDisposable()
@@ -218,7 +221,7 @@ class CartFragment : Fragment() {
             val view = LayoutInflater.from(context!!).inflate(R.layout.layout_place_order,null)
             val edt_address_dialog = view.findViewById<View>(R.id.edt_address_dialog) as EditText
             val edt_comment_dialog = view.findViewById<View>(R.id.edt_comment_dialog) as EditText
-            val txt_address_location = view.findViewById<View>(R.id.txt_address_detail) as TextView
+            val txt_address_detail = view.findViewById<View>(R.id.txt_address_detail) as TextView
 
             val rdi_home = view.findViewById<RadioButton>(R.id.rdi_home_address)
             val rdi_other_adress = view.findViewById<RadioButton>(R.id.rdi_other_address)
@@ -231,7 +234,7 @@ class CartFragment : Fragment() {
                 compoundButton,b->
                 if (b){
                     edt_address_dialog.setText(Common.currentUser!!.address!!)
-                    txt_address_location.visibility = View.GONE
+                    txt_address_detail.visibility = View.GONE
                 }
             }
             rdi_other_adress.setOnCheckedChangeListener{
@@ -239,7 +242,7 @@ class CartFragment : Fragment() {
                 if (b){
                     edt_address_dialog.setText("")
                     edt_address_dialog.setHint("Ingrese su direccion")
-                    txt_address_location.visibility = View.GONE
+                    txt_address_detail.visibility = View.GONE
                 }
             }
             rdi_shipAddres.setOnCheckedChangeListener{
@@ -247,7 +250,7 @@ class CartFragment : Fragment() {
                 if (b){
                     fusedLocationProviderClient!!.lastLocation
                         .addOnFailureListener{ e ->
-                            txt_address_location.visibility = View.GONE
+                            txt_address_detail.visibility = View.GONE
                             Toast.makeText(context,""+e.message, Toast.LENGTH_LONG).show()
                         }
                         .addOnCompleteListener{ task ->
@@ -265,14 +268,14 @@ class CartFragment : Fragment() {
                                 val disposable = singleAddress.subscribe(object:DisposableSingleObserver<String>(){
                                     override fun onSuccess(t: String) {
                                         edt_address_dialog.setText(coordinates)
-                                        txt_address_location.visibility = View.VISIBLE
-                                        txt_address_location.setText(t)
+                                        txt_address_detail.visibility = View.VISIBLE
+                                        txt_address_detail.setText(t)
                                     }
 
                                     override fun onError(e: Throwable) {
                                         edt_address_dialog.setText(coordinates)
-                                        txt_address_location.visibility = View.VISIBLE
-                                        txt_address_location.setText(e.message)
+                                        txt_address_detail.visibility = View.VISIBLE
+                                        txt_address_detail.setText(e.message)
                                     }
 
                                 })
@@ -298,7 +301,90 @@ class CartFragment : Fragment() {
 
     }
 
-    private fun paymedCOD(toString: String, toString1: String) {
+    private fun paymedCOD(address: String, comment: String) {
+        compositeDisposable.add(cartDataSource!!.getAllCart(Common.currentUser!!.uid!!)
+            .subscribeOn(Schedulers.io())
+            .observeOn(AndroidSchedulers.mainThread())
+            .subscribe({
+                cartListItem->
+                //una vez tengamos todos los items del carrito , obtenemos tambien la suma total de precio a pagar
+                cartDataSource!!.sumPrice(Common.currentUser!!.uid!!)
+                    .subscribeOn(Schedulers.io())
+                    .observeOn(AndroidSchedulers.mainThread())
+                    .subscribe(object : SingleObserver<Double>{
+                        override fun onSuccess(totalPrice: Double) {
+
+                            val finalPrice = totalPrice
+                            val order = OrderModel()
+                            order.userId = Common.currentUser!!.uid!!
+                            order.userName = Common.currentUser!!.name!!
+                            order.userPhone = Common.currentUser!!.phone!!
+                            order.shippingAddress = address
+                            order.comment = comment
+                            if (currentLocation != null){
+                                order.lat = currentLocation!!.latitude
+                                order.lng = currentLocation!!.longitude
+                            }
+                            order.cartItemList = cartListItem
+                            order.isCod = true
+                            order.totalPayment = totalPrice
+                            order.finalpayment = finalPrice
+                            order.discount = 0
+                            order.transactionId = "COD"
+
+                            //LO ENVIAMOS Y REGISTRAMOS EN FIREBASE
+                            writeOrderToFirebase(order)
+
+
+                        }
+
+                        override fun onSubscribe(d: Disposable) {
+                        }
+
+                        override fun onError(e: Throwable) {
+                        }
+
+                    })
+
+
+            },{
+               t->
+                Toast.makeText(context,""+t.message,Toast.LENGTH_LONG).show()
+            }))
+
+
+    }
+
+    private fun writeOrderToFirebase(order: OrderModel) {
+        FirebaseDatabase.getInstance()
+            .getReference(Common.ORDER_REFERENCE)
+            .child(Common.createOrderNumber())
+            .setValue(order)
+            .addOnFailureListener{e->Toast.makeText(context,""+e.message,Toast.LENGTH_LONG).show()}
+            .addOnCompleteListener{task ->
+
+                if (task.isSuccessful){
+                    //clean cart
+                    cartDataSource!!.cleanCart(Common.currentUser!!.uid!!)
+                        .subscribeOn(Schedulers.io())
+                        .observeOn(AndroidSchedulers.mainThread())
+                        .subscribe(object:SingleObserver<Int>{
+                            override fun onSuccess(t: Int) {
+                                Toast.makeText(context,"La orden se realizo exitosamente!",Toast.LENGTH_LONG).show()
+                            }
+
+                            override fun onSubscribe(d: Disposable) {
+                            }
+
+                            override fun onError(e: Throwable) {
+                                Toast.makeText(context,""+e.message,Toast.LENGTH_LONG).show()
+                            }
+
+                        })
+
+                }
+
+            }
 
     }
 
