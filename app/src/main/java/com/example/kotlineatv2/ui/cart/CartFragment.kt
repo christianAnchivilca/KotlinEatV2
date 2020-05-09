@@ -114,8 +114,6 @@ class CartFragment : Fragment() {
 
         })
 
-
-
         return root
     }
 
