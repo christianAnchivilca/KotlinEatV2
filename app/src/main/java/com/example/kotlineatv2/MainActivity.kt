@@ -11,6 +11,7 @@ import android.view.LayoutInflater
 import android.widget.EditText
 import android.widget.Toast
 import com.example.kotlineatv2.Common.Common
+import com.example.kotlineatv2.Model.BraintreeToken
 import com.example.kotlineatv2.Model.UserModel
 import com.example.kotlineatv2.Remote.ICloudFunctions
 import com.example.kotlineatv2.Remote.RetrofitCloudClient
@@ -26,7 +27,9 @@ import com.karumi.dexter.listener.PermissionGrantedResponse
 import com.karumi.dexter.listener.PermissionRequest
 import com.karumi.dexter.listener.single.PermissionListener
 import dmax.dialog.SpotsDialog
+import io.reactivex.android.schedulers.AndroidSchedulers
 import io.reactivex.disposables.CompositeDisposable
+import io.reactivex.schedulers.Schedulers
 import retrofit2.create
 import java.util.*
 
@@ -155,16 +158,30 @@ class MainActivity : AppCompatActivity() {
 
                     //VALIDAMOS SI EL USUARIO YA ESTA REGISTRADO EN FIREBASE
                     if (dataLogin.exists()){
-                        val userModel = dataLogin.getValue(UserModel::class.java)
-                        goToHomeActivity(userModel)
-                        Toast.makeText(baseContext,"Welcome back: "+userModel!!.name,Toast.LENGTH_LONG).show()
+                        compositeDisposable.add(iCloudFunctions!!.getToken()
+                            .subscribeOn(Schedulers.io())
+                            .observeOn(AndroidSchedulers.mainThread())
+                            .subscribe({
+                                braintreToken->
+                                dialog.dismiss()
+                                val userModel = dataLogin.getValue(UserModel::class.java)
+
+                                goToHomeActivity(userModel,braintreToken.token)
+                                Toast.makeText(baseContext,"Welcome back: "+userModel!!.name,Toast.LENGTH_LONG).show()
+
+                            },{
+                                dialog.dismiss()
+                                Toast.makeText(this@MainActivity,""+it.message,Toast.LENGTH_LONG).show()
+                            }))
+
 
                     }else{
+                        dialog!!.dismiss()
                         showRegisterDialog(user!!)
 
                     }
 
-                    dialog!!.dismiss()
+
                 }
 
             })
@@ -212,9 +229,20 @@ class MainActivity : AppCompatActivity() {
                 .addOnCompleteListener{
                     task ->
                     if (task.isSuccessful) {
-                        dialogInterface.dismiss()
-                        Toast.makeText(this@MainActivity,"Registrado con exito!",Toast.LENGTH_LONG).show()
-                        goToHomeActivity(userModel)
+                        //getToken
+                        compositeDisposable.add(iCloudFunctions.getToken()
+                            .subscribeOn(Schedulers.io())
+                            .observeOn(AndroidSchedulers.mainThread())
+                            .subscribe({
+                                braintreeToken->
+                                dialogInterface.dismiss()
+                                Toast.makeText(this@MainActivity,"Felicidades ! Registro exitoso",Toast.LENGTH_LONG).show()
+                                goToHomeActivity(userModel,braintreeToken.token)
+                            },{
+                                th:Throwable? ->
+                                Toast.makeText(this@MainActivity,""+th!!.message,Toast.LENGTH_LONG).show()
+                            }))
+
                     }else{
                         Toast.makeText(this@MainActivity,"Error al momento de registrar.",Toast.LENGTH_LONG).show()
                     }
@@ -228,8 +256,9 @@ class MainActivity : AppCompatActivity() {
 
     }
 
-    private fun goToHomeActivity(userModel: UserModel?) {
+    private fun goToHomeActivity(userModel: UserModel?,token:String?) {
         Common.currentUser = userModel!!
+        Common.currentToken = token!!
         startActivity(Intent(this@MainActivity,HomeActivity::class.java))
         finish()
 

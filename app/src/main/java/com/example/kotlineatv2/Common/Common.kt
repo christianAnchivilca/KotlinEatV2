@@ -78,6 +78,7 @@ object Common {
 
     }
 
+    var currentToken: String?=""
     val ORDER_REFERENCE: String = "Order"
     val COMMENT_REFERENCE: String = "Comments"
     val USER_REFERENCE:String = "Users"
