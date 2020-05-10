@@ -12,6 +12,4 @@ class Transaction {
     var orderId:String?=null
     var createAt:String?=null
     var updateAt:String?=null
-
-
 }
