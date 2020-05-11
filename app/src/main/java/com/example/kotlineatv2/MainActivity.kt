@@ -32,6 +32,7 @@ import io.reactivex.disposables.CompositeDisposable
 import io.reactivex.schedulers.Schedulers
 import retrofit2.create
 import java.util.*
+import kotlin.collections.HashMap
 
 class MainActivity : AppCompatActivity() {
 
@@ -72,6 +73,7 @@ class MainActivity : AppCompatActivity() {
 
         providers = Arrays.asList<AuthUI.IdpConfig>(AuthUI.IdpConfig.PhoneBuilder().build())
 
+        iCloudFunctions = RetrofitCloudClient.getInstance().create(ICloudFunctions::class.java)
         //instancia a la data en firebase
         userRef = FirebaseDatabase.getInstance().getReference(Common.USER_REFERENCE)
         firebaseAuth = FirebaseAuth.getInstance()
@@ -157,23 +159,39 @@ class MainActivity : AppCompatActivity() {
                 override fun onDataChange(dataLogin: DataSnapshot) {
 
                     //VALIDAMOS SI EL USUARIO YA ESTA REGISTRADO EN FIREBASE
-                    if (dataLogin.exists()){
-                        compositeDisposable.add(iCloudFunctions!!.getToken()
-                            .subscribeOn(Schedulers.io())
-                            .observeOn(AndroidSchedulers.mainThread())
-                            .subscribe({
-                                braintreToken->
-                                dialog.dismiss()
-                                val userModel = dataLogin.getValue(UserModel::class.java)
+                    if (dataLogin.exists())
+                    {
+                        //OBTENEMOS EL TOKEN DE NUESTRO USUARIO REGISTRADO EN FIREBASE
+                            FirebaseAuth.getInstance().currentUser!!
+                                .getIdToken(true)
+                                .addOnFailureListener{
+                                    t->
+                                    Toast.makeText(this@MainActivity,"ERROR->"+t.message,Toast.LENGTH_LONG).show()
+                                }
+                                .addOnCompleteListener{
 
-                                goToHomeActivity(userModel,braintreToken.token)
-                                Toast.makeText(baseContext,"Welcome back: "+userModel!!.name,Toast.LENGTH_LONG).show()
+                                    Common.authorizeToken = it.result!!.token
 
-                            },{
-                                dialog.dismiss()
-                                Toast.makeText(this@MainActivity,""+it.message,Toast.LENGTH_LONG).show()
-                            }))
+                                    val headers = HashMap<String,String>()
+                                    headers.put("Authorization",Common.buildToken(Common.authorizeToken))
 
+                                    compositeDisposable.add(iCloudFunctions!!.getToken(headers)
+                                        .subscribeOn(Schedulers.io())
+                                        .observeOn(AndroidSchedulers.mainThread())
+                                        .subscribe({
+                                                braintreToken->
+                                            dialog.dismiss()
+                                            val userModel = dataLogin.getValue(UserModel::class.java)
+
+                                            goToHomeActivity(userModel,braintreToken.token)
+                                            Toast.makeText(baseContext,"Welcome back: "+userModel!!.name,Toast.LENGTH_LONG).show()
+
+                                        },{
+                                            dialog.dismiss()
+                                            Toast.makeText(this@MainActivity,""+it.message,Toast.LENGTH_LONG).show()
+                                        }))
+
+                                }
 
                     }else{
                         dialog!!.dismiss()
@@ -229,19 +247,39 @@ class MainActivity : AppCompatActivity() {
                 .addOnCompleteListener{
                     task ->
                     if (task.isSuccessful) {
-                        //getToken
-                        compositeDisposable.add(iCloudFunctions.getToken()
-                            .subscribeOn(Schedulers.io())
-                            .observeOn(AndroidSchedulers.mainThread())
-                            .subscribe({
-                                braintreeToken->
-                                dialogInterface.dismiss()
-                                Toast.makeText(this@MainActivity,"Felicidades ! Registro exitoso",Toast.LENGTH_LONG).show()
-                                goToHomeActivity(userModel,braintreeToken.token)
-                            },{
-                                th:Throwable? ->
-                                Toast.makeText(this@MainActivity,""+th!!.message,Toast.LENGTH_LONG).show()
-                            }))
+
+                        //getToken del usuario registrado en firebase
+                        FirebaseAuth.getInstance().currentUser!!
+                            .getIdToken(true)
+                            .addOnFailureListener{
+
+                                Toast.makeText(this@MainActivity,""+it.message,Toast.LENGTH_LONG).show()
+                            }
+                            .addOnCompleteListener{
+                                //getToken Braintree
+
+                               Common.authorizeToken = it.result!!.token
+
+                                val headers = HashMap<String,String>()
+                                headers.put("Authorization",Common.buildToken(Common.authorizeToken))
+
+                                compositeDisposable.add(iCloudFunctions.getToken(headers)
+                                    .subscribeOn(Schedulers.io())
+                                    .observeOn(AndroidSchedulers.mainThread())
+                                    .subscribe({
+                                            braintreeToken->
+                                        dialogInterface.dismiss()
+                                        Toast.makeText(this@MainActivity,"Felicidades ! Registro exitoso",Toast.LENGTH_LONG).show()
+                                        goToHomeActivity(userModel,braintreeToken.token)
+                                    },{
+                                            th:Throwable? ->
+                                        Toast.makeText(this@MainActivity,""+th!!.message,Toast.LENGTH_LONG).show()
+                                    }))
+
+                            }
+
+
+
 
                     }else{
                         Toast.makeText(this@MainActivity,"Error al momento de registrar.",Toast.LENGTH_LONG).show()

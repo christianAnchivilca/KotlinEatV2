@@ -3,18 +3,18 @@ package com.example.kotlineatv2.Remote
 import com.example.kotlineatv2.Model.BraintreeToken
 import com.example.kotlineatv2.Model.BraintreeTransaction
 import io.reactivex.Observable
-import retrofit2.http.Field
-import retrofit2.http.GET
-import retrofit2.http.POST
+import retrofit2.http.*
 
 
 interface ICloudFunctions{
 
     @GET("token")
-    fun getToken():Observable<BraintreeToken>
+    fun getToken(@HeaderMap headers: Map<String, String>):Observable<BraintreeToken>
 
     @POST("checkout")
-    fun submitPayment(@Field("amount") amount:Double,
+    @FormUrlEncoded
+    fun submitPayment(@HeaderMap headers: Map<String, String>,
+                      @Field("amount") amount:Double,
                       @Field("payment_method_nonce") nonce:String):Observable<BraintreeTransaction>
 
 }

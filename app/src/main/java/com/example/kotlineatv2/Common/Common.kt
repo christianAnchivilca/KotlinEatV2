@@ -78,6 +78,11 @@ object Common {
 
     }
 
+    fun buildToken(authorizeToken: String?): String {
+        return StringBuilder("Bearer").append(" ").append(authorizeToken).toString()
+    }
+
+    var authorizeToken: String?=null
     var currentToken: String?=""
     val ORDER_REFERENCE: String = "Order"
     val COMMENT_REFERENCE: String = "Comments"

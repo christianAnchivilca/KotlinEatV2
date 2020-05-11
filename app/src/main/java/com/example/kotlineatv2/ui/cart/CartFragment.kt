@@ -1,12 +1,16 @@
 package com.example.kotlineatv2.ui.cart
 
+import android.app.Activity
 import android.app.AlertDialog
+import android.content.Intent
 import android.graphics.Color
 import android.location.Geocoder
 import android.location.Location
 import android.os.Bundle
 import android.os.Looper
 import android.os.Parcelable
+import android.text.TextUtils
+import android.util.Log
 import android.view.*
 import android.widget.*
 import androidx.cardview.widget.CardView
@@ -16,21 +20,30 @@ import androidx.lifecycle.ViewModelProviders
 import androidx.recyclerview.widget.DividerItemDecoration
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
+import com.braintreepayments.api.dropin.DropInRequest
+import com.braintreepayments.api.dropin.DropInResult
 import com.example.kotlineatv2.Adapter.MyCartAdapter
+import com.example.kotlineatv2.Callback.ILoadTimeFromFirebaseCallback
 import com.example.kotlineatv2.Callback.IMyButtonCallback
 import com.example.kotlineatv2.Common.Common
 import com.example.kotlineatv2.Common.MySwipeHelper
 import com.example.kotlineatv2.Database.CartDataSource
 import com.example.kotlineatv2.Database.CartDatabase
+import com.example.kotlineatv2.Database.CartItem
 import com.example.kotlineatv2.Database.LocalCartDataSource
 import com.example.kotlineatv2.EventBus.CounterCartEvent
 import com.example.kotlineatv2.EventBus.HidenFABCart
 import com.example.kotlineatv2.EventBus.UpdateItemInCart
 import com.example.kotlineatv2.Model.OrderModel
 import com.example.kotlineatv2.R
+import com.example.kotlineatv2.Remote.ICloudFunctions
+import com.example.kotlineatv2.Remote.RetrofitCloudClient
 import com.google.android.gms.location.*
 import com.google.android.material.button.MaterialButton
+import com.google.firebase.database.DataSnapshot
+import com.google.firebase.database.DatabaseError
 import com.google.firebase.database.FirebaseDatabase
+import com.google.firebase.database.ValueEventListener
 import io.reactivex.Single
 import io.reactivex.SingleObserver
 import io.reactivex.android.schedulers.AndroidSchedulers
@@ -45,11 +58,23 @@ import org.greenrobot.eventbus.ThreadMode
 import java.io.IOError
 import java.io.IOException
 import java.lang.StringBuilder
+import java.text.SimpleDateFormat
 import java.util.*
 
-class CartFragment : Fragment() {
+class CartFragment : Fragment(), ILoadTimeFromFirebaseCallback {
+
+    override fun onLoadTimeSuccess(order: OrderModel, estimatedTimeMs: Long) {
+
+        order.createDate = estimatedTimeMs
+        writeOrderToFirebase(order)
+    }
+
+    override fun onLoadTimeFailed(message: String) {
+        Toast.makeText(context,message,Toast.LENGTH_SHORT).show()
+    }
 
 
+    private val REQUEST_BRAINTREE_CODE :Int = 9999
     private var cartDataSource:CartDataSource? = null
     private var compositeDisposable:CompositeDisposable = CompositeDisposable()
     private var recyclerViewState:Parcelable?=null
@@ -67,6 +92,11 @@ class CartFragment : Fragment() {
     private lateinit var locationCallback:LocationCallback
     private lateinit var fusedLocationProviderClient: FusedLocationProviderClient
     private lateinit var currentLocation:Location
+
+    internal var address:String = ""
+    internal var comment:String = ""
+    lateinit var cloudFunctions:ICloudFunctions
+    lateinit var listener:ILoadTimeFromFirebaseCallback
 
 
     override fun onResume() {
@@ -150,6 +180,8 @@ class CartFragment : Fragment() {
     private fun initView(root: View) {
 
         setHasOptionsMenu(true) // important, if not add it , menu will never be inflate
+        cloudFunctions = RetrofitCloudClient.getInstance().create(ICloudFunctions::class.java)
+        listener = this
 
         cartDataSource = LocalCartDataSource(CartDatabase.getInstance(context!!).cartDAO())
         recycler_cart = root.findViewById(R.id.recycler_cart) as RecyclerView
@@ -291,8 +323,22 @@ class CartFragment : Fragment() {
             dialog.setView(view)
             dialog.setNegativeButton("NO"){dialogInterface,_->dialogInterface.dismiss()}
             dialog.setPositiveButton("SI"){dialogInterface,_->
-                if (rdi_cod.isChecked)
+                if (rdi_cod.isChecked){
                     paymedCOD(edt_address_dialog.text.toString(),edt_comment_dialog.text.toString())
+                }else if(rdi_braintree.isChecked){
+                    address = edt_address_dialog.text.toString()
+                    comment = edt_comment_dialog.text.toString()
+                    //si no es nulo, si tenemos Token
+                    if (!TextUtils.isEmpty(Common.currentToken))
+                    {
+                        val dropInRequest = DropInRequest().clientToken(Common.currentToken)
+                        startActivityForResult(dropInRequest.getIntent(context!!),REQUEST_BRAINTREE_CODE)
+
+                    }
+
+                }
+
+
             }
             val crear = dialog.create()
             crear.show()
@@ -333,7 +379,7 @@ class CartFragment : Fragment() {
                             order.transactionId = "COD"
 
                             //LO ENVIAMOS Y REGISTRAMOS EN FIREBASE
-                            writeOrderToFirebase(order)
+                            syncLocalTimeWithServerTime(order)
 
 
                         }
@@ -371,11 +417,10 @@ class CartFragment : Fragment() {
                         .subscribe(object:SingleObserver<Int>{
                             override fun onSuccess(t: Int) {
                                 Toast.makeText(context,"La orden se realizo exitosamente!",Toast.LENGTH_LONG).show()
+                               // EventBus.getDefault().postSticky(CounterCartEvent(true))
                             }
-
                             override fun onSubscribe(d: Disposable) {
                             }
-
                             override fun onError(e: Throwable) {
                                 Toast.makeText(context,""+e.message,Toast.LENGTH_LONG).show()
                             }
@@ -538,6 +583,118 @@ class CartFragment : Fragment() {
         }
 
         return super.onOptionsItemSelected(item)
+    }
+
+    //Cuando el usuario termina con la actividad subsiguiente y regresa, el sistema llama al método onActivityResult() de la actividad.
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode == REQUEST_BRAINTREE_CODE){
+
+            // Asegúrese de que la solicitud se haya realizado correctamente
+            if(resultCode ==  Activity.RESULT_OK)
+            {
+               val result = data!!.getParcelableExtra<DropInResult>(DropInResult.EXTRA_DROP_IN_RESULT)
+
+                val nonce = result!!.paymentMethodNonce
+                //calculamos la suma total
+                cartDataSource!!.sumPrice(Common.currentUser!!.uid!!)
+                    .subscribeOn(Schedulers.io())
+                    .observeOn(AndroidSchedulers.mainThread())
+                    .subscribe(object:SingleObserver<Double>{
+                        override fun onSuccess(totalPrice: Double) {
+                            //GET ALL ITEMS TO CREATE CART
+                            compositeDisposable.add(cartDataSource!!.getAllCart(Common.currentUser!!.uid!!)
+                                .subscribeOn(Schedulers.io())
+                                .observeOn(AndroidSchedulers.mainThread())
+                                .subscribe({
+                                    cartItems :List<CartItem> ->
+
+                                    val headers = HashMap<String,String>()
+                                    headers.put("Authorization",Common.buildToken(Common.authorizeToken))
+
+                                    compositeDisposable.add(cloudFunctions.submitPayment(headers,totalPrice,nonce!!.nonce)
+                                        .subscribeOn(Schedulers.io())
+                                        .observeOn(AndroidSchedulers.mainThread())
+                                        .subscribe({
+                                            braintreeTransaction ->
+
+                                            //si la transaccion fue exitosa
+                                            if (braintreeTransaction.success){
+                                                //create order en firebase
+                                                val finalPrice = totalPrice
+                                                val order = OrderModel()
+                                                order.userId = Common.currentUser!!.uid!!
+                                                order.userName = Common.currentUser!!.name!!
+                                                order.userPhone = Common.currentUser!!.phone!!
+                                                order.shippingAddress = address
+                                                order.comment = comment
+                                                if (currentLocation != null){
+                                                    order.lat = currentLocation!!.latitude
+                                                    order.lng = currentLocation!!.longitude
+                                                }
+                                                order.cartItemList = cartItems
+                                                order.isCod = false
+                                                order.totalPayment = totalPrice
+                                                order.finalpayment = finalPrice
+                                                order.discount = 0
+                                                order.transactionId = braintreeTransaction.transaction!!.id
+
+                                                //LO ENVIAMOS Y REGISTRAMOS EN FIREBASE
+                                                syncLocalTimeWithServerTime(order)
+
+                                            }
+
+
+                                        },{
+                                          t:Throwable->
+                                            Toast.makeText(context,""+t.message, Toast.LENGTH_LONG).show()
+
+                                        }))
+
+
+
+                                },{
+                                    t:Throwable->
+                                    Toast.makeText(context,""+t.message, Toast.LENGTH_LONG).show()
+                                }))
+
+
+                        }
+
+                        override fun onSubscribe(d: Disposable) {
+
+                        }
+
+                        override fun onError(e: Throwable) {
+                            Toast.makeText(context!!,e.message,Toast.LENGTH_LONG).show()
+
+                        }
+
+                    })
+            }
+        }
+    }
+
+    private fun syncLocalTimeWithServerTime(order: OrderModel) {
+        val offsetRef = FirebaseDatabase.getInstance().getReference(".info/serverTimeOffset")
+        offsetRef.addListenerForSingleValueEvent(object :ValueEventListener{
+
+
+            override fun onCancelled(p0: DatabaseError) {
+                listener.onLoadTimeFailed(p0.message)
+            }
+
+            override fun onDataChange(p0: DataSnapshot) {
+                val offset = p0.getValue(Long::class.java)
+                val estimatedServerTimeInMs = System.currentTimeMillis() + offset!!
+                val sdf = SimpleDateFormat("MMM dd yyyy, HH:mm")
+                val date = Date(estimatedServerTimeInMs)
+                Log.d("TIME-EXECUTE",""+sdf.format(date))
+                listener.onLoadTimeSuccess(order,estimatedServerTimeInMs)
+            }
+
+        })
+
     }
 
 }
