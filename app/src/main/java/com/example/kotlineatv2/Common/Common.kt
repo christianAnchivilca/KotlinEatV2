@@ -82,6 +82,35 @@ object Common {
         return StringBuilder("Bearer").append(" ").append(authorizeToken).toString()
     }
 
+    fun getDateOfWeek(get: Int): String {
+        when(get){
+            1 -> return "Lunes"
+            2 -> return "Martes"
+            3 -> return "Miercoles"
+            4 -> return "Jueves"
+            5 -> return "Viernes"
+            6 -> return "Sabado"
+            7 -> return "Domingo"
+            else -> return "Unknow"
+
+
+        }
+
+    }
+
+    fun convertStatusToText(orderStatus: Int): String {
+        when(orderStatus){
+
+            0->return "Placed"
+            1->return "Shipping"
+            2->return "Shipped"
+            -1->return "Cancelled"
+            else -> return "Unknow"
+
+        }
+
+    }
+
     var authorizeToken: String?=null
     var currentToken: String?=""
     val ORDER_REFERENCE: String = "Order"

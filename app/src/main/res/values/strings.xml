@@ -25,4 +25,7 @@
     <string name="menu_food_list">Food List</string>
     <string name="size">Tamaño</string>
     <string name="addon">Añadir</string>
+    <string name="menu_view_order">Ordenes</string>
+
+
 </resources>

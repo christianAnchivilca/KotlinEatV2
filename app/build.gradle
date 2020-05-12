@@ -82,6 +82,9 @@ dependencies {
 
     implementation 'com.braintreepayments.api:drop-in:4.1.1'
 
+    implementation 'com.jakewharton:butterknife:8.0.1'
+    kapt 'com.jakewharton:butterknife-compiler:8.0.1'
+
 
 
 

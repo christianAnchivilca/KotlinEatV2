@@ -116,6 +116,11 @@ class HomeActivity : AppCompatActivity() {
                     navController.navigate(R.id.nav_cart)
 
                 }
+                else if(menu.itemId == R.id.nav_view_orders)
+                {
+                    navController.navigate(R.id.nav_view_order)
+
+                }
 
 
                 return true
