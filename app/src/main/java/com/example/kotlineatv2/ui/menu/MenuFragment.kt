@@ -17,9 +17,11 @@ import androidx.recyclerview.widget.RecyclerView
 import com.example.kotlineatv2.Adapter.MyCategoriesAdapter
 import com.example.kotlineatv2.Common.Common
 import com.example.kotlineatv2.Common.SpaceItemDecoration
+import com.example.kotlineatv2.EventBus.MenuItemBack
 import com.example.kotlineatv2.R
 import dmax.dialog.SpotsDialog
 import kotlinx.android.synthetic.main.fragment_category.*
+import org.greenrobot.eventbus.EventBus
 
 class MenuFragment : Fragment() {
 
@@ -84,5 +86,10 @@ class MenuFragment : Fragment() {
         recycler_menu!!.layoutManager = layoutManager
         recycler_menu!!.addItemDecoration(SpaceItemDecoration(8))
 
+    }
+
+    override fun onDestroy() {
+        EventBus.getDefault().postSticky(MenuItemBack())
+        super.onDestroy()
     }
 }

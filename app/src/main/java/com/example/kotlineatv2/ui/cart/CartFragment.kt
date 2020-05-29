@@ -33,6 +33,7 @@ import com.example.kotlineatv2.Database.CartItem
 import com.example.kotlineatv2.Database.LocalCartDataSource
 import com.example.kotlineatv2.EventBus.CounterCartEvent
 import com.example.kotlineatv2.EventBus.HidenFABCart
+import com.example.kotlineatv2.EventBus.MenuItemBack
 import com.example.kotlineatv2.EventBus.UpdateItemInCart
 import com.example.kotlineatv2.Model.OrderModel
 import com.example.kotlineatv2.R
@@ -696,6 +697,11 @@ class CartFragment : Fragment(), ILoadTimeFromFirebaseCallback {
 
         })
 
+    }
+
+    override fun onDestroy() {
+        EventBus.getDefault().postSticky(MenuItemBack())
+        super.onDestroy()
     }
 
 }

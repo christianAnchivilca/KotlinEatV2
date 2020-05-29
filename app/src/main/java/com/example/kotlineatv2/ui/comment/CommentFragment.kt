@@ -14,6 +14,7 @@ import androidx.recyclerview.widget.RecyclerView
 import com.example.kotlineatv2.Adapter.MyCommentAdapter
 import com.example.kotlineatv2.Callback.ICommentCallBackListener
 import com.example.kotlineatv2.Common.Common
+import com.example.kotlineatv2.EventBus.MenuItemBack
 import com.example.kotlineatv2.Model.CommentModel
 import com.example.kotlineatv2.R
 import com.google.android.material.bottomsheet.BottomSheetDialogFragment
@@ -22,6 +23,7 @@ import com.google.firebase.database.DatabaseError
 import com.google.firebase.database.FirebaseDatabase
 import com.google.firebase.database.ValueEventListener
 import dmax.dialog.SpotsDialog
+import org.greenrobot.eventbus.EventBus
 
 class CommentFragment : BottomSheetDialogFragment(),ICommentCallBackListener {
 
@@ -115,6 +117,8 @@ class CommentFragment : BottomSheetDialogFragment(),ICommentCallBackListener {
             return instance!!
         }
     }
+
+
 
 
 }

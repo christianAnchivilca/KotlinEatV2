@@ -53,6 +53,8 @@ class HomeActivity : AppCompatActivity() {
     private  var drawer:DrawerLayout?=null
     private var dialog:AlertDialog?=null
 
+    private var menuItemClick = -1
+
 
     override fun onResume() {
         super.onResume()
@@ -103,26 +105,31 @@ class HomeActivity : AppCompatActivity() {
                 }
                 else if(menu.itemId == R.id.nav_home)
                 {
-                    navController.navigate(R.id.nav_home)
+                    if(menuItemClick != menu.itemId)
+                        navController.navigate(R.id.nav_home)
 
                 }
                 else if(menu.itemId == R.id.nav_menu)
                 {
-                    navController.navigate(R.id.nav_menu)
+                    if(menuItemClick != menu.itemId)
+                       navController.navigate(R.id.nav_menu)
 
                 }
                 else if(menu.itemId == R.id.nav_cart)
                 {
-                    navController.navigate(R.id.nav_cart)
+                    if(menuItemClick != menu.itemId)
+                       navController.navigate(R.id.nav_cart)
 
                 }
                 else if(menu.itemId == R.id.nav_view_orders)
                 {
-                    navController.navigate(R.id.nav_view_order)
+                    if(menuItemClick != menu.itemId)
+                       navController.navigate(R.id.nav_view_order)
 
                 }
 
 
+                menuItemClick =menu!!.itemId
                 return true
             }
 
@@ -350,6 +357,20 @@ class HomeActivity : AppCompatActivity() {
         }else{
             fab.show()
         }
+
+    }
+
+
+    @Subscribe(sticky = true,threadMode = ThreadMode.MAIN)
+    fun onMenuItemBack(event:MenuItemBack){
+        menuItemClick = -1
+        if(supportFragmentManager.backStackEntryCount > 0)//si hay mas de un fragmento
+            //Ahora popBackStack()revierte su última transacción que ha agregado a BackStack.
+            supportFragmentManager.popBackStack();
+
+        //Significado de "revertir":
+        //intr. Volver una cosa al estado o condición que tuvo antes.
+
 
     }
 

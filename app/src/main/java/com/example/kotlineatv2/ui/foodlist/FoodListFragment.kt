@@ -13,7 +13,9 @@ import androidx.lifecycle.ViewModelProviders
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.example.kotlineatv2.Adapter.MyFoodListAdapter
+import com.example.kotlineatv2.EventBus.MenuItemBack
 import com.example.kotlineatv2.R
+import org.greenrobot.eventbus.EventBus
 
 class FoodListFragment : Fragment() {
 
@@ -55,5 +57,10 @@ class FoodListFragment : Fragment() {
         recycler_food_lis!!.layoutManager = LinearLayoutManager(context)
 
         layoutAnimator = AnimationUtils.loadLayoutAnimation(context,R.anim.layout_item_from_left)
+    }
+
+    override fun onDestroy() {
+        EventBus.getDefault().postSticky(MenuItemBack())
+        super.onDestroy()
     }
 }

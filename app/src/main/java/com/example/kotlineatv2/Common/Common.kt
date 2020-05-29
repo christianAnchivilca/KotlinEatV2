@@ -1,13 +1,27 @@
 package com.example.kotlineatv2.Common
 
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.app.PendingIntent
+import android.content.Context
+import android.content.Intent
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import android.graphics.Color
 import android.graphics.Typeface
+import android.os.Build
 import android.text.Spannable
 import android.text.SpannableString
 import android.text.SpannableStringBuilder
 import android.text.style.StyleSpan
 import android.widget.TextView
+import android.widget.Toast
+import androidx.core.app.NotificationCompat
 import com.example.kotlineatv2.Model.*
+import com.example.kotlineatv2.R
+import com.example.kotlineatv2.Services.MyFCMServices
 import com.google.firebase.database.DatabaseReference
+import com.google.firebase.database.FirebaseDatabase
 import java.lang.StringBuilder
 import java.lang.reflect.Type
 import java.math.RoundingMode
@@ -111,17 +125,65 @@ object Common {
 
     }
 
+    fun updateToken(context:Context, token: String) {
+        FirebaseDatabase.getInstance()
+            .getReference(Common.TOKEN_REF)
+            .child(Common.currentUser!!.uid!!)
+            .setValue(TokenModel(Common.currentUser!!.phone!!,token))
+            .addOnFailureListener{
+                e->Toast.makeText(context,""+e.message,Toast.LENGTH_LONG).show()
+            }
+
+
+    }
+
+    fun showNotification(context:Context, id: Int, title: String?, content: String?,intent:Intent?) {
+        var pendingIntent:PendingIntent? = null
+        if (intent != null)
+            pendingIntent = PendingIntent.getActivity(context,id,intent,PendingIntent.FLAG_UPDATE_CURRENT)
+        val NOTIFICATION_CHANNEL_ID = "edmt.dev.eatitv2"
+        val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)
+        {
+            val notificationChannel = NotificationChannel(NOTIFICATION_CHANNEL_ID,"Eat It v2",
+                NotificationManager.IMPORTANCE_DEFAULT)
+
+            notificationChannel.description="Eat It v2"
+            notificationChannel.enableLights(true)
+            notificationChannel.enableVibration(true)
+            notificationChannel.lightColor = (Color.RED)
+            notificationChannel.vibrationPattern = longArrayOf(0,1000,500,1000)
+
+            notificationManager.createNotificationChannel(notificationChannel)
+        }
+
+        val builder = NotificationCompat.Builder(context,NOTIFICATION_CHANNEL_ID)
+        builder.setContentTitle(title!!).setContentText(content)
+            .setAutoCancel(true)
+            .setSmallIcon(R.mipmap.ic_launcher_round)
+            .setLargeIcon(BitmapFactory.decodeResource(context.resources,R.drawable.ic_restaurant_menu_black_24dp))
+        if (pendingIntent != null)
+            builder.setContentIntent(pendingIntent)
+        val notification = builder.build()
+        notificationManager.notify(id,notification)
+
+
+    }
+
+    const val NOTI_CONTENT: String = "content"
+    const val NOTI_TITLE: String = "title"
+    const val TOKEN_REF: String = "Tokens"
     var authorizeToken: String?=null
     var currentToken: String?=""
-    val ORDER_REFERENCE: String = "Order"
-    val COMMENT_REFERENCE: String = "Comments"
+    const val ORDER_REFERENCE: String = "Order"
+    const val COMMENT_REFERENCE: String = "Comments"
     val USER_REFERENCE:String = "Users"
     var currentUser:UserModel? = null
-    val POPULAR_REFERENCE:String = "MostPopular"
-    val BESTDEAL_REFERENCE:String = "BestDeals"
+    const val POPULAR_REFERENCE:String = "MostPopular"
+    const val BESTDEAL_REFERENCE:String = "BestDeals"
     val DEFAULT_COLUMN_COUNT:Int = 0
     val FULL_WIDTH_COLUMN:Int = 1
-    val CATEGORY_REFERENCE:String = "Category"
+    const val CATEGORY_REFERENCE:String = "Category"
     var category_selected:CategoryModel?=null
     var foodModelSelected:FoodModel?=null
 }

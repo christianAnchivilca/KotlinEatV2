@@ -20,6 +20,7 @@ import com.example.kotlineatv2.Database.CartDatabase
 import com.example.kotlineatv2.Database.CartItem
 import com.example.kotlineatv2.Database.LocalCartDataSource
 import com.example.kotlineatv2.EventBus.CounterCartEvent
+import com.example.kotlineatv2.EventBus.MenuItemBack
 import com.example.kotlineatv2.Model.CommentModel
 import com.example.kotlineatv2.Model.FoodModel
 import com.example.kotlineatv2.R
@@ -504,5 +505,10 @@ class FoodDetailFragment : Fragment(),TextWatcher {
         val dialog = builder.create()
         dialog.show()
 
+    }
+
+    override fun onDestroy() {
+        EventBus.getDefault().postSticky(MenuItemBack())
+        super.onDestroy()
     }
 }
