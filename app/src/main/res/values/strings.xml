@@ -26,6 +26,7 @@
     <string name="size">Tamaño</string>
     <string name="addon">Añadir</string>
     <string name="menu_view_order">Ordenes</string>
+    <string name="action_search">Buscar</string>
 
 
 </resources>
