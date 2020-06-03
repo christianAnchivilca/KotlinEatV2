@@ -35,10 +35,13 @@ import com.example.kotlineatv2.EventBus.CounterCartEvent
 import com.example.kotlineatv2.EventBus.HidenFABCart
 import com.example.kotlineatv2.EventBus.MenuItemBack
 import com.example.kotlineatv2.EventBus.UpdateItemInCart
+import com.example.kotlineatv2.Model.FCMSendData
 import com.example.kotlineatv2.Model.OrderModel
 import com.example.kotlineatv2.R
 import com.example.kotlineatv2.Remote.ICloudFunctions
+import com.example.kotlineatv2.Remote.IFCMService
 import com.example.kotlineatv2.Remote.RetrofitCloudClient
+import com.example.kotlineatv2.Remote.RetrofitFCMClient
 import com.google.android.gms.location.*
 import com.google.android.material.button.MaterialButton
 import com.google.firebase.database.DataSnapshot
@@ -61,6 +64,7 @@ import java.io.IOException
 import java.lang.StringBuilder
 import java.text.SimpleDateFormat
 import java.util.*
+import kotlin.collections.HashMap
 
 class CartFragment : Fragment(), ILoadTimeFromFirebaseCallback {
 
@@ -99,6 +103,7 @@ class CartFragment : Fragment(), ILoadTimeFromFirebaseCallback {
     internal var comment:String = ""
     lateinit var cloudFunctions:ICloudFunctions
     lateinit var listener:ILoadTimeFromFirebaseCallback
+    lateinit var ifcmService:IFCMService
 
 
     override fun onResume() {
@@ -183,6 +188,9 @@ class CartFragment : Fragment(), ILoadTimeFromFirebaseCallback {
 
         setHasOptionsMenu(true) // important, if not add it , menu will never be inflate
         cloudFunctions = RetrofitCloudClient.getInstance().create(ICloudFunctions::class.java)
+        //set initialize fcmservice
+        ifcmService = RetrofitFCMClient.getInstance().create(IFCMService::class.java)
+
         listener = this
 
         cartDataSource = LocalCartDataSource(CartDatabase.getInstance(context!!).cartDAO())
@@ -390,6 +398,8 @@ class CartFragment : Fragment(), ILoadTimeFromFirebaseCallback {
                         }
 
                         override fun onError(e: Throwable) {
+                            if (!e.message!!.contains("Query returned empty"))
+                                Toast.makeText(context,""+e.message, Toast.LENGTH_LONG).show()
                         }
 
                     })
@@ -418,8 +428,30 @@ class CartFragment : Fragment(), ILoadTimeFromFirebaseCallback {
                         .observeOn(AndroidSchedulers.mainThread())
                         .subscribe(object:SingleObserver<Int>{
                             override fun onSuccess(t: Int) {
-                                Toast.makeText(context,"La orden se realizo exitosamente!",Toast.LENGTH_LONG).show()
-                               // EventBus.getDefault().postSticky(CounterCartEvent(true))
+                                val dataSend = HashMap<String,String>()
+                                dataSend.put(Common.NOTI_TITLE,"Nueva Orden")
+                                dataSend.put(Common.NOTI_CONTENT,"Tienes una nueva orden: "+Common.currentUser!!.phone)
+
+                                val sendData = FCMSendData(Common.getNewOrderTopic(),dataSend)
+
+                                compositeDisposable.add(
+
+                                    ifcmService.sendNotification(sendData)
+                                        .subscribeOn(Schedulers.io())
+                                        .observeOn(AndroidSchedulers.mainThread())
+                                        .subscribe({
+                                            if (it.success != 0)
+                                                Toast.makeText(context,"Orden realizada exitosamente!",Toast.LENGTH_LONG).show()
+                                        },{
+                                            t: Throwable? ->
+                                            Toast.makeText(context,""+t!!.message,Toast.LENGTH_LONG).show()
+                                        })
+
+                                )
+
+
+
+
                             }
                             override fun onSubscribe(d: Disposable) {
                             }
@@ -649,7 +681,10 @@ class CartFragment : Fragment(), ILoadTimeFromFirebaseCallback {
 
                                         },{
                                           t:Throwable->
-                                            Toast.makeText(context,""+t.message, Toast.LENGTH_LONG).show()
+                                            if (!t.message!!.contains("Query returned empty"))
+                                                Toast.makeText(context,""+t.message, Toast.LENGTH_LONG).show()
+
+
 
                                         }))
 
@@ -668,7 +703,8 @@ class CartFragment : Fragment(), ILoadTimeFromFirebaseCallback {
                         }
 
                         override fun onError(e: Throwable) {
-                            Toast.makeText(context!!,e.message,Toast.LENGTH_LONG).show()
+                            if (!e.message!!.contains("Query returned empty"))
+                                Toast.makeText(context,""+e.message, Toast.LENGTH_LONG).show()
 
                         }
 

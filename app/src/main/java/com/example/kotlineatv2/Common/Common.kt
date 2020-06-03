@@ -170,6 +170,11 @@ object Common {
 
     }
 
+    fun getNewOrderTopic(): String {
+        return StringBuilder("/topics/new_order").toString()
+
+    }
+
     const val NOTI_CONTENT: String = "content"
     const val NOTI_TITLE: String = "title"
     const val TOKEN_REF: String = "Tokens"
