@@ -3,7 +3,9 @@ package com.example.kotlineatv2
 import android.app.AlertDialog
 import android.content.Intent
 import android.os.Bundle
+import android.text.TextUtils
 import android.util.Log
+import android.view.LayoutInflater
 import com.google.android.material.floatingactionbutton.FloatingActionButton
 import com.google.android.material.snackbar.Snackbar
 import androidx.navigation.findNavController
@@ -17,6 +19,7 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.widget.Toolbar
 import android.view.Menu
 import android.view.MenuItem
+import android.widget.EditText
 import android.widget.TextView
 import android.widget.Toast
 
@@ -29,11 +32,15 @@ import com.example.kotlineatv2.EventBus.*
 import com.example.kotlineatv2.Model.CategoryModel
 import com.example.kotlineatv2.Model.FoodModel
 import com.example.kotlineatv2.Model.PopularCategoryModel
+import com.example.kotlineatv2.Model.UserModel
+import com.google.android.gms.common.api.Status
+import com.google.android.libraries.places.api.Places
+import com.google.android.libraries.places.api.model.Place
+import com.google.android.libraries.places.api.net.PlacesClient
+import com.google.android.libraries.places.widget.AutocompleteSupportFragment
+import com.google.android.libraries.places.widget.listener.PlaceSelectionListener
 import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.database.DataSnapshot
-import com.google.firebase.database.DatabaseError
-import com.google.firebase.database.FirebaseDatabase
-import com.google.firebase.database.ValueEventListener
+import com.google.firebase.database.*
 import dmax.dialog.SpotsDialog
 import io.reactivex.SingleObserver
 import io.reactivex.android.schedulers.AndroidSchedulers
@@ -44,8 +51,19 @@ import kotlinx.android.synthetic.main.app_bar_home.*
 import org.greenrobot.eventbus.EventBus
 import org.greenrobot.eventbus.Subscribe
 import org.greenrobot.eventbus.ThreadMode
+import java.util.*
+import kotlin.collections.HashMap
 
 class HomeActivity : AppCompatActivity() {
+
+    // GOOGLE PLACES VARIABLES
+    private var placeSelected:Place?=null
+    private var places_fragment:AutocompleteSupportFragment?=null
+    private lateinit var placeClient: PlacesClient
+    private val placeFields = Arrays.asList(Place.Field.ID,
+        Place.Field.NAME,
+        Place.Field.ADDRESS,
+        Place.Field.LAT_LNG)
 
     private lateinit var appBarConfiguration: AppBarConfiguration
     private lateinit var  navController :NavController
@@ -121,6 +139,11 @@ class HomeActivity : AppCompatActivity() {
                        navController.navigate(R.id.nav_cart)
 
                 }
+                else if(menu.itemId == R.id.nav_update_info)
+                {
+                    showUpdateInfoDialog()
+
+                }
                 else if(menu.itemId == R.id.nav_view_orders)
                 {
                     if(menuItemClick != menu.itemId)
@@ -135,8 +158,103 @@ class HomeActivity : AppCompatActivity() {
 
         })
 
+        initPlacesClient()
+
 
         countCartItem()
+
+    }
+
+    private fun initPlacesClient() {
+        Places.initialize(this,getString(R.string.google_maps_key))
+        placeClient = Places.createClient(this)
+    }
+
+    private fun showUpdateInfoDialog() {
+
+        val builder = AlertDialog.Builder(this)
+        builder.setTitle("Actualizar")
+        builder.setMessage("Completa tu informacion")
+
+        val itemView = LayoutInflater.from(this@HomeActivity)
+            .inflate(R.layout.layout_register,null)
+        val edt_name = itemView.findViewById<EditText>(R.id.edt_name)
+        val edt_phone = itemView.findViewById<EditText>(R.id.edt_phone)
+        val txt_address = itemView.findViewById<TextView>(R.id.txt_address_detail)
+
+        places_fragment = supportFragmentManager
+            .findFragmentById(R.id.places_autocomplete_fragment) as AutocompleteSupportFragment
+        places_fragment!!.setPlaceFields(placeFields)
+        places_fragment!!.setOnPlaceSelectedListener(object: PlaceSelectionListener {
+            override fun onPlaceSelected(p0: Place) {
+                placeSelected = p0
+                txt_address.text = placeSelected!!.address
+            }
+
+            override fun onError(p0: Status) {
+
+                Toast.makeText(this@HomeActivity,""+p0.statusMessage,Toast.LENGTH_LONG).show()
+
+            }
+
+        })
+
+        //set
+        edt_phone.setText(Common.currentUser!!.phone)
+        txt_address.setText(Common.currentUser!!.address)
+        edt_name.setText(Common.currentUser!!.name)
+
+        //Aqui seteamos nuestro formulario de registro dentro del AlertDialog
+        builder.setView(itemView)
+        builder.setNegativeButton("CANCEL"){dialogInterface, i -> dialogInterface.dismiss() }
+        builder.setPositiveButton("UPDATE"){dialogInterface, i ->
+
+            if (placeSelected != null){
+
+                if(TextUtils.isDigitsOnly(edt_name.text.toString()) ) {
+                    Toast.makeText(this@HomeActivity,"Please enter your name",Toast.LENGTH_LONG).show()
+                    return@setPositiveButton
+                }
+
+                //Actualizar info of user
+                val update_data = HashMap<String,Any>()
+                update_data.put("name",edt_name.text.toString())
+                update_data.put("address",txt_address.text.toString())
+                update_data.put("phone",edt_phone.text.toString())
+                update_data.put("lat",placeSelected!!.latLng!!.latitude)
+                update_data.put("lng",placeSelected!!.latLng!!.longitude)
+
+                FirebaseDatabase.getInstance()
+                    .getReference(Common.USER_REFERENCE)
+                    .child(Common.currentUser!!.uid!!)
+                    .updateChildren(update_data)
+                    .addOnFailureListener{
+                        Toast.makeText(this@HomeActivity,""+it.message,Toast.LENGTH_LONG).show()
+                    }
+                    .addOnSuccessListener {
+                        //update common currentUser
+                        Common.currentUser!!.name = update_data["name"].toString()
+                        Common.currentUser!!.address = update_data["address"].toString()
+                        Common.currentUser!!.phone = update_data["phone"].toString()
+                        Common.currentUser!!.lat = update_data["lat"].toString().toDouble()
+                        Common.currentUser!!.lng = update_data["lng"].toString().toDouble()
+
+                        Toast.makeText(this@HomeActivity,"Update info success",Toast.LENGTH_LONG).show()
+                    }
+            }else {
+                Toast.makeText(this@HomeActivity,"Please select address",Toast.LENGTH_LONG).show()
+            }
+
+
+        }
+
+        val dialogo1 = builder.create()
+        dialogo1.setOnDismissListener {
+            val fragmentTransaction = supportFragmentManager.beginTransaction()
+            fragmentTransaction.remove(places_fragment!!)
+            fragmentTransaction.commit()
+        }
+        dialogo1.show()
 
     }
 

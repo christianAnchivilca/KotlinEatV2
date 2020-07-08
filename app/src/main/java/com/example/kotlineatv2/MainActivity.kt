@@ -9,6 +9,7 @@ import android.os.Bundle
 import android.text.TextUtils
 import android.view.LayoutInflater
 import android.widget.EditText
+import android.widget.TextView
 import android.widget.Toast
 import com.example.kotlineatv2.Common.Common
 import com.example.kotlineatv2.Model.BraintreeToken
@@ -17,6 +18,12 @@ import com.example.kotlineatv2.Remote.ICloudFunctions
 import com.example.kotlineatv2.Remote.RetrofitCloudClient
 import com.firebase.ui.auth.AuthUI
 import com.firebase.ui.auth.IdpResponse
+import com.google.android.gms.common.api.Status
+import com.google.android.libraries.places.api.Places
+import com.google.android.libraries.places.api.model.Place
+import com.google.android.libraries.places.api.net.PlacesClient
+import com.google.android.libraries.places.widget.AutocompleteSupportFragment
+import com.google.android.libraries.places.widget.listener.PlaceSelectionListener
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.FirebaseUser
 import com.google.firebase.database.*
@@ -36,6 +43,16 @@ import java.util.*
 import kotlin.collections.HashMap
 
 class MainActivity : AppCompatActivity() {
+
+    // GOOGLE PLACES VARIABLES
+    private var placeSelected:Place?=null
+    private var places_fragment:AutocompleteSupportFragment?=null
+    private lateinit var placeClient:PlacesClient
+    private val placeFields = Arrays.asList(Place.Field.ID,
+        Place.Field.NAME,
+        Place.Field.ADDRESS,
+        Place.Field.LAT_LNG)
+
 
     internal lateinit var  firebaseAuth:FirebaseAuth
     internal lateinit var  listener:FirebaseAuth.AuthStateListener
@@ -72,8 +89,10 @@ class MainActivity : AppCompatActivity() {
 
     private fun init(){
 
-        providers = Arrays.asList<AuthUI.IdpConfig>(AuthUI.IdpConfig.PhoneBuilder().build())
+        Places.initialize(this,getString(R.string.google_maps_key))
+        placeClient = Places.createClient(this)
 
+        providers = Arrays.asList<AuthUI.IdpConfig>(AuthUI.IdpConfig.PhoneBuilder().build())
         iCloudFunctions = RetrofitCloudClient.getInstance().create(ICloudFunctions::class.java)
         //instancia a la data en firebase
         userRef = FirebaseDatabase.getInstance().getReference(Common.USER_REFERENCE)
@@ -215,9 +234,25 @@ class MainActivity : AppCompatActivity() {
         val itemView = LayoutInflater.from(this)
             .inflate(R.layout.layout_register,null)
         val edt_name = itemView.findViewById<EditText>(R.id.edt_name)
-        val edt_address = itemView.findViewById<EditText>(R.id.edt_address)
-
         val edt_phone = itemView.findViewById<EditText>(R.id.edt_phone)
+        val txt_address = itemView.findViewById<TextView>(R.id.txt_address_detail)
+
+        places_fragment = supportFragmentManager
+            .findFragmentById(R.id.places_autocomplete_fragment) as AutocompleteSupportFragment
+        places_fragment!!.setPlaceFields(placeFields)
+        places_fragment!!.setOnPlaceSelectedListener(object:PlaceSelectionListener{
+            override fun onPlaceSelected(p0: Place) {
+                placeSelected = p0
+                txt_address.text = placeSelected!!.address
+            }
+
+            override fun onError(p0: Status) {
+
+                Toast.makeText(this@MainActivity,""+p0.statusMessage,Toast.LENGTH_LONG).show()
+
+            }
+
+        })
 
         //set
         edt_phone.setText(user!!.phoneNumber)
@@ -225,45 +260,39 @@ class MainActivity : AppCompatActivity() {
 
         //Aqui seteamos nuestro formulario de registro dentro del AlertDialogo
         builder.setView(itemView)
-
         builder.setNegativeButton("CANCEL"){dialogInterface, i -> dialogInterface.dismiss() }
         builder.setPositiveButton("REGISTRAR"){dialogInterface, i ->
-            if(TextUtils.isDigitsOnly(edt_name.text.toString()) ) {
-                Toast.makeText(this@MainActivity,"Please enter your name",Toast.LENGTH_LONG).show()
-                return@setPositiveButton
-            }else if(TextUtils.isDigitsOnly(edt_address.text.toString())){
-                Toast.makeText(this@MainActivity,"Please enter your address",Toast.LENGTH_LONG).show()
-                return@setPositiveButton
-            }
 
+            if (placeSelected != null){
 
+                if(TextUtils.isDigitsOnly(edt_name.text.toString()) ) {
+                    Toast.makeText(this@MainActivity,"Please enter your name",Toast.LENGTH_LONG).show()
+                    return@setPositiveButton
+                }
             val userModel = UserModel()
-            userModel.uid = user!!.uid
-            userModel.name = edt_name.text.toString()
-            userModel.address = edt_address.text.toString()
-            userModel.phone = edt_phone.text.toString()
+                userModel.uid = user!!.uid
+                userModel.name = edt_name.text.toString()
+                userModel.address = txt_address.text.toString()
+                userModel.phone = edt_phone.text.toString()
+                userModel.lat = placeSelected!!.latLng!!.latitude
+                userModel.lng = placeSelected!!.latLng!!.longitude
 
             userRef!!.child(user!!.uid)
                 .setValue(userModel)
                 .addOnCompleteListener{
                     task ->
                     if (task.isSuccessful) {
-
                         //getToken del usuario registrado en firebase
                         FirebaseAuth.getInstance().currentUser!!
                             .getIdToken(true)
                             .addOnFailureListener{
-
                                 Toast.makeText(this@MainActivity,""+it.message,Toast.LENGTH_LONG).show()
                             }
                             .addOnCompleteListener{
                                 //getToken Braintree
-
                                Common.authorizeToken = it.result!!.token
-
                                 val headers = HashMap<String,String>()
                                 headers.put("Authorization",Common.buildToken(Common.authorizeToken))
-
                                 compositeDisposable.add(iCloudFunctions.getToken(headers)
                                     .subscribeOn(Schedulers.io())
                                     .observeOn(AndroidSchedulers.mainThread())
@@ -276,20 +305,26 @@ class MainActivity : AppCompatActivity() {
                                             th:Throwable? ->
                                         Toast.makeText(this@MainActivity,""+th!!.message,Toast.LENGTH_LONG).show()
                                     }))
-
                             }
-
-
-
-
                     }else{
                         Toast.makeText(this@MainActivity,"Error al momento de registrar.",Toast.LENGTH_LONG).show()
                     }
                 }
 
+          }else
+            {
+                Toast.makeText(this@MainActivity,"Please select address",Toast.LENGTH_LONG).show()
+            }
+
+
         }
 
         val dialogo1 = builder.create()
+        dialogo1.setOnDismissListener {
+            val fragmentTransaction = supportFragmentManager.beginTransaction()
+            fragmentTransaction.remove(places_fragment!!)
+            fragmentTransaction.commit()
+        }
         dialogo1.show()
 
 

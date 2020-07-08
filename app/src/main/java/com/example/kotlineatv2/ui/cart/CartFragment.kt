@@ -1,8 +1,11 @@
 package com.example.kotlineatv2.ui.cart
 
+import android.Manifest
+import android.annotation.SuppressLint
 import android.app.Activity
 import android.app.AlertDialog
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.graphics.Color
 import android.location.Geocoder
 import android.location.Location
@@ -14,6 +17,7 @@ import android.util.Log
 import android.view.*
 import android.widget.*
 import androidx.cardview.widget.CardView
+import androidx.core.app.ActivityCompat
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.Observer
 import androidx.lifecycle.ViewModelProviders
@@ -42,7 +46,13 @@ import com.example.kotlineatv2.Remote.ICloudFunctions
 import com.example.kotlineatv2.Remote.IFCMService
 import com.example.kotlineatv2.Remote.RetrofitCloudClient
 import com.example.kotlineatv2.Remote.RetrofitFCMClient
+import com.google.android.gms.common.api.Status
 import com.google.android.gms.location.*
+import com.google.android.libraries.places.api.Places
+import com.google.android.libraries.places.api.model.Place
+import com.google.android.libraries.places.api.net.PlacesClient
+import com.google.android.libraries.places.widget.AutocompleteSupportFragment
+import com.google.android.libraries.places.widget.listener.PlaceSelectionListener
 import com.google.android.material.button.MaterialButton
 import com.google.firebase.database.DataSnapshot
 import com.google.firebase.database.DatabaseError
@@ -68,6 +78,7 @@ import kotlin.collections.HashMap
 
 class CartFragment : Fragment(), ILoadTimeFromFirebaseCallback {
 
+
     override fun onLoadTimeSuccess(order: OrderModel, estimatedTimeMs: Long) {
 
         order.createDate = estimatedTimeMs
@@ -78,6 +89,16 @@ class CartFragment : Fragment(), ILoadTimeFromFirebaseCallback {
     override fun onLoadTimeFailed(message: String) {
         Toast.makeText(context,message,Toast.LENGTH_SHORT).show()
     }
+
+    // GOOGLE PLACES VARIABLES
+    private var placeSelected: Place?=null
+    private var places_fragment: AutocompleteSupportFragment?=null
+    private lateinit var placeClient: PlacesClient
+    private val placeFields = Arrays.asList(
+        Place.Field.ID,
+        Place.Field.NAME,
+        Place.Field.ADDRESS,
+        Place.Field.LAT_LNG)
 
 
     private val REQUEST_BRAINTREE_CODE :Int = 9999
@@ -106,9 +127,27 @@ class CartFragment : Fragment(), ILoadTimeFromFirebaseCallback {
     lateinit var ifcmService:IFCMService
 
 
+
     override fun onResume() {
         super.onResume()
         calculateTotalPrice()
+        if (ActivityCompat.checkSelfPermission(
+                context!!,
+                Manifest.permission.ACCESS_FINE_LOCATION
+            ) != PackageManager.PERMISSION_GRANTED && ActivityCompat.checkSelfPermission(
+                context!!,
+                Manifest.permission.ACCESS_COARSE_LOCATION
+            ) != PackageManager.PERMISSION_GRANTED
+        ) {
+            // TODO: Consider calling
+            //    ActivityCompat#requestPermissions
+            // here to request the missing permissions, and then overriding
+            //   public void onRequestPermissionsResult(int requestCode, String[] permissions,
+            //                                          int[] grantResults)
+            // to handle the case where the user grants the permission. See the documentation
+            // for ActivityCompat#requestPermissions for more details.
+            return
+        }
         if (fusedLocationProviderClient != null)
             fusedLocationProviderClient.requestLocationUpdates(locationRequest,locationCallback,
                 Looper.getMainLooper())
@@ -186,6 +225,8 @@ class CartFragment : Fragment(), ILoadTimeFromFirebaseCallback {
 
     private fun initView(root: View) {
 
+        initPlaceClient()
+
         setHasOptionsMenu(true) // important, if not add it , menu will never be inflate
         cloudFunctions = RetrofitCloudClient.getInstance().create(ICloudFunctions::class.java)
         //set initialize fcmservice
@@ -261,30 +302,48 @@ class CartFragment : Fragment(), ILoadTimeFromFirebaseCallback {
             dialog.setTitle("Un Paso Mas !")
 
             val view = LayoutInflater.from(context!!).inflate(R.layout.layout_place_order,null)
-            val edt_address_dialog = view.findViewById<View>(R.id.edt_address_dialog) as EditText
+
             val edt_comment_dialog = view.findViewById<View>(R.id.edt_comment_dialog) as EditText
-            val txt_address_detail = view.findViewById<View>(R.id.txt_address_detail) as TextView
+            val txt_address = view.findViewById<View>(R.id.txt_address_detail) as TextView
 
             val rdi_home = view.findViewById<RadioButton>(R.id.rdi_home_address)
             val rdi_other_adress = view.findViewById<RadioButton>(R.id.rdi_other_address)
             val rdi_shipAddres = view.findViewById<RadioButton>(R.id.rdi_ship_this_address)
             val rdi_cod = view.findViewById<RadioButton>(R.id.rdi_cod)
             val rdi_braintree = view.findViewById<RadioButton>(R.id.rdi_braintree)
-            edt_address_dialog.setText(Common.currentUser!!.address!!)
+
+            places_fragment = activity!!.supportFragmentManager
+                .findFragmentById(R.id.places_autocomplete_fragment) as AutocompleteSupportFragment
+            places_fragment!!.setPlaceFields(placeFields)
+            places_fragment!!.setOnPlaceSelectedListener(object: PlaceSelectionListener {
+                override fun onPlaceSelected(p0: Place) {
+                    placeSelected = p0
+                    txt_address.text = placeSelected!!.address
+                }
+
+                override fun onError(p0: Status) {
+
+                    Toast.makeText(context!!,""+p0.statusMessage,Toast.LENGTH_LONG).show()
+
+                }
+
+            })
+
+
+            txt_address.setText(Common.currentUser!!.address!!)
 
             rdi_home.setOnCheckedChangeListener{
                 compoundButton,b->
                 if (b){
-                    edt_address_dialog.setText(Common.currentUser!!.address!!)
-                    txt_address_detail.visibility = View.GONE
+                    txt_address.setText(Common.currentUser!!.address!!)
+
                 }
             }
             rdi_other_adress.setOnCheckedChangeListener{
                     compoundButton,b->
                 if (b){
-                    edt_address_dialog.setText("")
-                    edt_address_dialog.setHint("Ingrese su direccion")
-                    txt_address_detail.visibility = View.GONE
+
+                    txt_address.setText("")
                 }
             }
             rdi_shipAddres.setOnCheckedChangeListener{
@@ -292,7 +351,7 @@ class CartFragment : Fragment(), ILoadTimeFromFirebaseCallback {
                 if (b){
                     fusedLocationProviderClient!!.lastLocation
                         .addOnFailureListener{ e ->
-                            txt_address_detail.visibility = View.GONE
+                            txt_address.visibility = View.GONE
                             Toast.makeText(context,""+e.message, Toast.LENGTH_LONG).show()
                         }
                         .addOnCompleteListener{ task ->
@@ -309,15 +368,13 @@ class CartFragment : Fragment(), ILoadTimeFromFirebaseCallback {
                                     task.result!!.longitude))
                                 val disposable = singleAddress.subscribe(object:DisposableSingleObserver<String>(){
                                     override fun onSuccess(t: String) {
-                                        edt_address_dialog.setText(coordinates)
-                                        txt_address_detail.visibility = View.VISIBLE
-                                        txt_address_detail.setText(t)
+
+                                        txt_address.setText(t)
                                     }
 
                                     override fun onError(e: Throwable) {
-                                        edt_address_dialog.setText(coordinates)
-                                        txt_address_detail.visibility = View.VISIBLE
-                                        txt_address_detail.setText(e.message)
+
+                                        txt_address.setText(e.message)
                                     }
 
                                 })
@@ -334,26 +391,27 @@ class CartFragment : Fragment(), ILoadTimeFromFirebaseCallback {
             dialog.setNegativeButton("NO"){dialogInterface,_->dialogInterface.dismiss()}
             dialog.setPositiveButton("SI"){dialogInterface,_->
                 if (rdi_cod.isChecked){
-                    paymedCOD(edt_address_dialog.text.toString(),edt_comment_dialog.text.toString())
+                    paymedCOD(txt_address.text.toString(),edt_comment_dialog.text.toString())
                 }else if(rdi_braintree.isChecked){
-                    address = edt_address_dialog.text.toString()
+                    address = txt_address.text.toString()
                     comment = edt_comment_dialog.text.toString()
                     //si no es nulo, si tenemos Token
                     if (!TextUtils.isEmpty(Common.currentToken))
                     {
                         val dropInRequest = DropInRequest().clientToken(Common.currentToken)
                         startActivityForResult(dropInRequest.getIntent(context!!),REQUEST_BRAINTREE_CODE)
-
                     }
-
                 }
-
-
             }
-            val crear = dialog.create()
-            crear.show()
-
+            val crearDialogo = dialog.create()
+            crearDialogo.show()
         }
+
+    }
+
+    private fun initPlaceClient() {
+        Places.initialize(context!!,getString(R.string.google_maps_key))
+        placeClient = Places.createClient(context!!)
 
     }
 
