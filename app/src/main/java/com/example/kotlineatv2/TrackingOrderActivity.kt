@@ -49,7 +49,7 @@ class TrackingOrderActivity : AppCompatActivity(), OnMapReadyCallback, ValueEven
     private val compositeDisposable = CompositeDisposable()
     private var polylineList:List<LatLng> = ArrayList<LatLng>()
 
-    private var isInit=true
+    private var isInit=false
 
     private lateinit var shipperRef:DatabaseReference
     private var handler:Handler?=null
