@@ -23,6 +23,10 @@ import com.example.kotlineatv2.Adapter.MyOrderAdapter
 import com.example.kotlineatv2.Callback.ILoadOrderCallbackListener
 import com.example.kotlineatv2.Common.Common
 import com.example.kotlineatv2.Common.SwipeToDeleteCallback
+import com.example.kotlineatv2.Database.CartDataSource
+import com.example.kotlineatv2.Database.CartDatabase
+import com.example.kotlineatv2.Database.LocalCartDataSource
+import com.example.kotlineatv2.EventBus.CounterCartEvent
 import com.example.kotlineatv2.EventBus.MenuItemBack
 import com.example.kotlineatv2.Model.OrderModel
 import com.example.kotlineatv2.Model.RefundRequestModel
@@ -34,6 +38,11 @@ import com.google.firebase.database.DatabaseError
 import com.google.firebase.database.FirebaseDatabase
 import com.google.firebase.database.ValueEventListener
 import dmax.dialog.SpotsDialog
+import io.reactivex.SingleObserver
+import io.reactivex.android.schedulers.AndroidSchedulers
+import io.reactivex.disposables.CompositeDisposable
+import io.reactivex.disposables.Disposable
+import io.reactivex.schedulers.Schedulers
 import kotlinx.android.synthetic.main.layout_refund_request.*
 import org.greenrobot.eventbus.EventBus
 import java.util.*
@@ -48,6 +57,8 @@ class ViewOrdersFragment:Fragment(),ILoadOrderCallbackListener {
     internal lateinit var dialog:AlertDialog
     internal lateinit var recycler_order:RecyclerView
     internal lateinit var listener:ILoadOrderCallbackListener
+    lateinit var cartDataSource:CartDataSource
+    var compositeDisposable = CompositeDisposable()
 
 
     override fun onCreateView(
@@ -96,6 +107,8 @@ class ViewOrdersFragment:Fragment(),ILoadOrderCallbackListener {
     }
 
     private fun initView(root: View?) {
+
+        cartDataSource = LocalCartDataSource(CartDatabase.getInstance(context!!).cartDAO())
         listener = this
         dialog = SpotsDialog.Builder().setContext(context!!).setCancelable(false).build()
         recycler_order = root!!.findViewById(R.id.recycler_order) as RecyclerView
@@ -126,8 +139,10 @@ class ViewOrdersFragment:Fragment(),ILoadOrderCallbackListener {
         dialogo.setView(itemview)
         val rdb_cancelar_orden = itemview.findViewById<View>(R.id.rdb_cancelar_orden)as RadioButton
         val rdb_traking_orden = itemview.findViewById<View>(R.id.rdb_traking_orden)as RadioButton
+        val rdb_repeat_orden = itemview.findViewById<View>(R.id.rdb_repeat_orden)as RadioButton
 
         dialogo.setNegativeButton("CANCELAR"){dialogInterface,_->dialogInterface.dismiss()
+            loadOrderFromFirebase()
         }
         dialogo.setPositiveButton("ACEPTAR"){dialogInterface,_->
             if (rdb_cancelar_orden.isChecked){
@@ -282,6 +297,48 @@ class ViewOrdersFragment:Fragment(),ILoadOrderCallbackListener {
 
 
             }
+            else if(rdb_repeat_orden.isChecked)
+            {
+                val orderModel = (recycler_order.adapter as MyOrderAdapter).getItemAtPosition(adapterPosition)
+                dialog.show()
+                 cartDataSource.cleanCart(Common.currentUser!!.uid!!)
+                     .subscribeOn(Schedulers.io())
+                     .observeOn(AndroidSchedulers.mainThread())
+                     .subscribe(object:SingleObserver<Int>{
+
+                         override fun onSuccess(t: Int) {
+
+                             val cartItems = orderModel.cartItemList!!.toTypedArray()
+                             compositeDisposable.add(
+                                 cartDataSource.insertOrReplace(*cartItems)// * -> mean we insert varargs items
+                                     .subscribeOn(Schedulers.io())
+                                     .observeOn(AndroidSchedulers.mainThread())
+                                     .subscribe({
+                                         dialog.dismiss()
+                                         EventBus.getDefault().postSticky(CounterCartEvent(true))//update fab counter
+                                         Toast.makeText(context,"Agregado al carrito!",Toast.LENGTH_SHORT).show()
+                                     },{
+                                         dialog.dismiss()
+                                         Toast.makeText(context,""+it.message,Toast.LENGTH_SHORT).show()
+                                     })
+                             )
+                         }
+
+                         override fun onSubscribe(d: Disposable) {
+                             dialog.dismiss()
+                         }
+
+                         override fun onError(e: Throwable) {
+                             dialog.dismiss()
+                             Toast.makeText(context!!,""+e.message,Toast.LENGTH_LONG).show()
+                         }
+
+                     })
+
+
+
+
+            }
 
         }
 
@@ -306,6 +363,7 @@ class ViewOrdersFragment:Fragment(),ILoadOrderCallbackListener {
 
     override fun onDestroy() {
         EventBus.getDefault().postSticky(MenuItemBack())
+        compositeDisposable.clear()
         super.onDestroy()
     }
 

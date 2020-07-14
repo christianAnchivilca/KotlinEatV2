@@ -67,6 +67,7 @@ class MyFoodListAdapter (internal var context: Context,
         holder.img_cart!!.setOnClickListener{
             val cartItem = CartItem()
             cartItem.uid = Common.currentUser!!.uid!!
+            cartItem.categoryId = Common.category_selected!!.menu_id!!
             cartItem.userPhone = Common.currentUser!!.phone!!
             cartItem.foodId = foodList.get(position).id!!
             cartItem.foodName = foodList.get(position).name!!
@@ -78,6 +79,7 @@ class MyFoodListAdapter (internal var context: Context,
             cartItem.foodSize = "Default"
 
             cartDataSource.getItemWithAllOptionsInCart(Common.currentUser!!.uid!!,
+                cartItem.categoryId,
                 cartItem.foodId,cartItem.foodSize!!,cartItem.foodAddon!!)
                 .subscribeOn(Schedulers.io())
                 .observeOn(AndroidSchedulers.mainThread())

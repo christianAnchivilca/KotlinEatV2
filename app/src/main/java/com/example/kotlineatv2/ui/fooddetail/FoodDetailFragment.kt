@@ -123,146 +123,6 @@ class FoodDetailFragment : Fragment(),TextWatcher {
         return root
     }
 
-    private fun submitRatingToFirebase(commentModel: CommentModel?) {
-
-        waitingDialog!!.show()
-        //primero , obtenemos una referencia de firebase
-         FirebaseDatabase.getInstance().getReference(Common.COMMENT_REFERENCE)
-            .child(Common.foodModelSelected!!.id!!)
-            .push()
-             .setValue(commentModel)
-             .addOnCompleteListener{
-                 task ->
-                 if (task.isSuccessful){
-                     addRatingToFood(commentModel!!.ratingValue.toDouble())
-
-                 }
-                     waitingDialog!!.dismiss()
-
-             }
-
-    }
-
-    private fun addRatingToFood(ratingValue: Double) {
-       // System.out.println("addRating "+Common.category_selected!!.menu_id!!)
-        FirebaseDatabase.getInstance()
-            .getReference(Common.CATEGORY_REFERENCE) //  SELECT CATEGORY
-            .child(Common.category_selected!!.menu_id!!) // SELECT MENU IN CATEGORY
-            .child("foods") // select food array
-            .child(Common.foodModelSelected!!.key!!) // select key
-            // 1 de los 3 métodos para obtener sus datos de Firebase Realtime Database:
-            .addListenerForSingleValueEvent(object :ValueEventListener{
-                override fun onCancelled(p0: DatabaseError) {
-                    waitingDialog!!.dismiss()
-                    Toast.makeText(context,""+p0.message,Toast.LENGTH_LONG).show()
-                }
-
-                override fun onDataChange(data: DataSnapshot) {
-                    if (data.exists()){
-
-                        val foodModel = data.getValue(FoodModel::class.java)
-                        foodModel!!.key = Common.foodModelSelected!!.key
-                        val sumRating = foodModel.ratingValue.toDouble() + ratingValue
-                        val ratingCount = foodModel.ratingCount + 1
-
-                       // val result = sumRating / ratingCount
-
-                        val updateData = HashMap<String,Any>()
-                        updateData["ratingValue"] = sumRating
-                        updateData["ratingCount"] = ratingCount
-
-                        //update data in variable
-                        foodModel.ratingCount = ratingCount
-                        foodModel.ratingValue = sumRating
-
-                        data.ref
-                            .updateChildren(updateData)
-                            .addOnCompleteListener{task ->
-                                waitingDialog!!.dismiss()
-                                if (task.isSuccessful){
-                                    Common.foodModelSelected = foodModel
-                                    foodDetailViewModel!!.setFoodModel(foodModel)
-                                    Toast.makeText(context,"Gracias por tu calificacion !",Toast.LENGTH_LONG).show()
-                                }
-                            }
-
-
-                    }else{
-                        waitingDialog!!.dismiss()
-                    }
-
-                }
-
-            })
-
-
-
-
-    }
-
-    private fun displayInfo(foodModel:FoodModel?) {
-
-        Glide.with(context!!).load(foodModel!!.image).into(img_food!!)
-        foodName!!.text = StringBuilder(foodModel!!.name!!)
-        foodPrice!!.text = StringBuilder(foodModel!!.price!!.toString())
-        foodDescription!!.text = StringBuilder(foodModel!!.description!!)
-
-        ratingBar!!.rating = foodModel!!.ratingValue.toFloat() / foodModel!!.ratingCount
-
-           rb_medium!!.text = foodModel.size[0].name
-            rb_medium!!.tag = foodModel.size[0].price
-
-            rb_large!!.text = foodModel.size[1].name
-            rb_large!!.tag = foodModel.size[1].price
-
-
-        rb_medium!!.setOnCheckedChangeListener{compoundButton,b->
-            if (b)
-                Common.foodModelSelected!!.userSelectedSize = foodModel.size[0]
-            calculateTotalPrice()
-
-        }
-
-        rb_large!!.setOnCheckedChangeListener{compoundButton,b->
-            if (b)
-                Common.foodModelSelected!!.userSelectedSize = foodModel.size[1]
-            calculateTotalPrice()
-
-        }
-
-
-        //POR DEFECTO EL PRIMER RADIO ESTARA SELECCIONADO
-        if (radioGroupSize!!.childCount > 0){
-            val radioButton1 = radioGroupSize!!.getChildAt(0) as RadioButton
-            radioButton1.isChecked = true
-        }
-
-    }
-
-    private fun calculateTotalPrice() {
-        var totalPrice = Common.foodModelSelected!!.price.toDouble()
-        var displayPrice = 0.0
-
-        //Addon
-        if (Common.foodModelSelected!!.userSelectedAddon != null && Common.foodModelSelected!!.userSelectedAddon!!.size > 0){
-
-            for (addModel in Common.foodModelSelected!!.userSelectedAddon!!){
-
-                totalPrice += addModel.price!!.toDouble()
-
-            }
-
-        }
-
-
-
-        totalPrice += Common.foodModelSelected!!.userSelectedSize!!.price!!.toDouble()
-        displayPrice = totalPrice * numberButton!!.number.toInt()
-        displayPrice = Math.round(displayPrice * 100.0)/100.0
-
-        foodPrice!!.text = StringBuilder("").append(Common.formatPrice(displayPrice)).toString()
-
-    }
 
     private fun initView(root:View?) {
 
@@ -276,7 +136,7 @@ class FoodDetailFragment : Fragment(),TextWatcher {
 
         addOnBottomSheetDialog.setContentView(layout_user_selected_addon)
         addOnBottomSheetDialog.setOnDismissListener{
-            dialogInterface ->
+                dialogInterface ->
 
             displayUserSelectedAddon()
             calculateTotalPrice()
@@ -308,7 +168,7 @@ class FoodDetailFragment : Fragment(),TextWatcher {
         }
 
         btnRating!!.setOnClickListener {
-              showDialogRating()
+            showDialogRating()
         }
 
         bnShowCommet!!.setOnClickListener{
@@ -322,6 +182,7 @@ class FoodDetailFragment : Fragment(),TextWatcher {
 
             val cartItem = CartItem()
             cartItem.uid = Common.currentUser!!.uid!!
+            cartItem.categoryId = Common.category_selected!!.menu_id!!
             cartItem.userPhone = Common.currentUser!!.phone!!
             cartItem.foodId = Common.foodModelSelected!!.id!!
             cartItem.foodName = Common.foodModelSelected!!.name!!
@@ -345,6 +206,7 @@ class FoodDetailFragment : Fragment(),TextWatcher {
 
 
             cartDataSource.getItemWithAllOptionsInCart(Common.currentUser!!.uid!!,
+                cartItem.categoryId,
                 cartItem.foodId,cartItem.foodSize!!,cartItem.foodAddon!!)
                 .subscribeOn(Schedulers.io())
                 .observeOn(AndroidSchedulers.mainThread())
@@ -433,6 +295,148 @@ class FoodDetailFragment : Fragment(),TextWatcher {
 
 
     }
+
+    private fun submitRatingToFirebase(commentModel: CommentModel?) {
+
+        waitingDialog!!.show()
+        //primero , obtenemos una referencia de firebase
+         FirebaseDatabase.getInstance().getReference(Common.COMMENT_REFERENCE)
+            .child(Common.foodModelSelected!!.id!!)
+            .push()
+             .setValue(commentModel)
+             .addOnCompleteListener{
+                 task ->
+                 if (task.isSuccessful){
+                     addRatingToFood(commentModel!!.ratingValue.toDouble())
+
+                 }
+                     waitingDialog!!.dismiss()
+
+             }
+
+    }
+
+    private fun addRatingToFood(ratingValue: Double) {
+       // System.out.println("addRating "+Common.category_selected!!.menu_id!!)
+        FirebaseDatabase.getInstance()
+            .getReference(Common.CATEGORY_REFERENCE) //  SELECT CATEGORY
+            .child(Common.category_selected!!.menu_id!!) // SELECT MENU IN CATEGORY
+            .child("foods") // select food array
+            .child(Common.foodModelSelected!!.key!!) // select key
+            // 1 de los 3 métodos para obtener sus datos de Firebase Realtime Database:
+            .addListenerForSingleValueEvent(object :ValueEventListener{
+                override fun onCancelled(p0: DatabaseError) {
+                    waitingDialog!!.dismiss()
+                    Toast.makeText(context,""+p0.message,Toast.LENGTH_LONG).show()
+                }
+
+                override fun onDataChange(data: DataSnapshot) {
+                    if (data.exists()){
+
+                        val foodModel = data.getValue(FoodModel::class.java)
+                        foodModel!!.key = Common.foodModelSelected!!.key
+                        val sumRating = foodModel.ratingValue.toDouble() + ratingValue
+                        val ratingCount = foodModel.ratingCount + 1
+
+                       // val result = sumRating / ratingCount
+
+                        val updateData = HashMap<String,Any>()
+                        updateData["ratingValue"] = sumRating
+                        updateData["ratingCount"] = ratingCount
+
+                        //update data in variable
+                        foodModel.ratingCount = ratingCount
+                        foodModel.ratingValue = sumRating
+
+                        data.ref
+                            .updateChildren(updateData)
+                            .addOnCompleteListener{task ->
+                                waitingDialog!!.dismiss()
+                                if (task.isSuccessful){
+                                    Common.foodModelSelected = foodModel
+                                    foodDetailViewModel!!.setFoodModel(foodModel)
+                                    Toast.makeText(context,"Gracias por tu calificacion !",Toast.LENGTH_LONG).show()
+                                }
+                            }
+
+
+                    }else{
+                        waitingDialog!!.dismiss()
+                    }
+
+                }
+
+            })
+
+
+
+
+    }
+
+    private fun displayInfo(foodModel:FoodModel?) {
+
+        Glide.with(context!!).load(foodModel!!.image).into(img_food!!)
+        foodName!!.text = StringBuilder(foodModel!!.name!!)
+        foodPrice!!.text = StringBuilder(foodModel!!.price!!.toString())
+        foodDescription!!.text = StringBuilder(foodModel!!.description!!)
+
+        ratingBar!!.rating = foodModel!!.ratingValue.toFloat() / foodModel!!.ratingCount
+
+        rb_medium!!.text = foodModel.size[0].name
+        rb_medium!!.tag = foodModel.size[0].price
+        rb_large!!.text = foodModel.size[1].name
+        rb_large!!.tag = foodModel.size[1].price
+
+
+        rb_medium!!.setOnCheckedChangeListener{compoundButton,b->
+            if (b)
+                Common.foodModelSelected!!.userSelectedSize = foodModel.size[0]
+            calculateTotalPrice()
+
+        }
+
+        rb_large!!.setOnCheckedChangeListener{compoundButton,b->
+            if (b)
+                Common.foodModelSelected!!.userSelectedSize = foodModel.size[1]
+            calculateTotalPrice()
+
+        }
+
+
+        //POR DEFECTO EL PRIMER RADIO ESTARA SELECCIONADO
+        if (radioGroupSize!!.childCount > 0){
+            val radioButton1 = radioGroupSize!!.getChildAt(0) as RadioButton
+            radioButton1.isChecked = true
+        }
+
+    }
+
+    private fun calculateTotalPrice() {
+        var totalPrice = Common.foodModelSelected!!.price.toDouble()
+        var displayPrice = 0.0
+
+        //Addon
+        if (Common.foodModelSelected!!.userSelectedAddon != null && Common.foodModelSelected!!.userSelectedAddon!!.size > 0){
+
+            for (addModel in Common.foodModelSelected!!.userSelectedAddon!!){
+
+                totalPrice += addModel.price!!.toDouble()
+
+            }
+
+        }
+
+
+
+        totalPrice += Common.foodModelSelected!!.userSelectedSize!!.price!!.toDouble()
+        displayPrice = totalPrice * numberButton!!.number.toInt()
+        displayPrice = Math.round(displayPrice * 100.0)/100.0
+
+        foodPrice!!.text = StringBuilder("").append(Common.formatPrice(displayPrice)).toString()
+
+    }
+
+
 
     private fun displayAllAddOn() {
         if (Common.foodModelSelected!!.addon!!.size > 0){

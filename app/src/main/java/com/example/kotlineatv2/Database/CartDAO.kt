@@ -33,8 +33,8 @@ interface CartDAO {
     fun cleanCart(uid:String):Single<Int>
 
 
-    @Query("SELECT * FROM Cart WHERE foodId=:foodId AND uid=:uid AND foodSize=:foodSize AND foodAddon=:foodAddon")
-    fun getItemWithAllOptionsInCart(uid:String,foodId:String,foodSize:String,foodAddon:String):Single<CartItem>
+    @Query("SELECT * FROM Cart WHERE categoryId=:categoryId AND foodId=:foodId AND uid=:uid AND foodSize=:foodSize AND foodAddon=:foodAddon")
+    fun getItemWithAllOptionsInCart(uid:String,categoryId:String,foodId:String,foodSize:String,foodAddon:String):Single<CartItem>
 
 
 

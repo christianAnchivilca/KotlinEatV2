@@ -227,6 +227,16 @@ object Common {
         return -1.0f
     }
 
+    fun findFoodInListById(category: CategoryModel, foodId: String): FoodModel?
+    {
+        return if(category!!.foods != null && category.foods!!.size > 0)
+        {
+            for (foodModel in category!!.foods!!)if(foodModel.id.equals(foodId))
+                return foodModel
+            null
+        }else null
+    }
+
     var currentShippingOrder:ShippingOrderModel?=null
     const val SHIPPING_ORDER_REF:String ="ShippingOrder"
     const val REFUND_REQUEST_REF: String ="RefundRequest"
