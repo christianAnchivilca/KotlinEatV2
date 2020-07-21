@@ -14,7 +14,7 @@ abstract class CartDatabase: RoomDatabase() {
         private var instance:CartDatabase?=null
         fun getInstance(context: Context):CartDatabase{
             if (instance == null)
-                instance = Room.databaseBuilder<CartDatabase>(context,CartDatabase::class.java!!,"EatItV2DB2").build()
+                instance = Room.databaseBuilder<CartDatabase>(context,CartDatabase::class.java!!,"EatItV2DB3").build()
                 return instance!!
 
         }
