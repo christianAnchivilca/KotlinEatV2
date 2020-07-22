@@ -17,6 +17,14 @@
             android:title="@string/menu_category" />
     </group>
 
+    <group android:id="@+id/news_groups">
+        <item
+            android:id="@+id/nav_news"
+            android:icon="@drawable/ic_markunread_24"
+            android:title="@string/menu_news" />
+    </group>
+
+
 
     <group android:id="@+id/cart_group">
         <item

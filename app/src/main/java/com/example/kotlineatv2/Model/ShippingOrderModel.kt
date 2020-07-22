@@ -8,4 +8,5 @@ class ShippingOrderModel {
     var orderModel:OrderModel?=null
     var isStartTrip=false
     var key:String?=null
+    var estimateTime:String =""
 }

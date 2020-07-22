@@ -1,6 +1,7 @@
 package com.example.kotlineatv2
 
 import android.app.AlertDialog
+import android.content.DialogInterface
 import android.content.Intent
 import android.os.Bundle
 import android.text.TextUtils
@@ -19,6 +20,8 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.widget.Toolbar
 import android.view.Menu
 import android.view.MenuItem
+import android.view.View
+import android.widget.CheckBox
 import android.widget.EditText
 import android.widget.TextView
 import android.widget.Toast
@@ -41,7 +44,9 @@ import com.google.android.libraries.places.widget.AutocompleteSupportFragment
 import com.google.android.libraries.places.widget.listener.PlaceSelectionListener
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.database.*
+import com.google.firebase.messaging.FirebaseMessaging
 import dmax.dialog.SpotsDialog
+import io.paperdb.Paper
 import io.reactivex.SingleObserver
 import io.reactivex.android.schedulers.AndroidSchedulers
 import io.reactivex.disposables.Disposable
@@ -150,6 +155,11 @@ class HomeActivity : AppCompatActivity() {
                        navController.navigate(R.id.nav_view_order)
 
                 }
+                else if(menu.itemId == R.id.nav_news)
+                {
+                    showNewsDialog()
+
+                }
 
 
                 menuItemClick =menu!!.itemId
@@ -162,6 +172,53 @@ class HomeActivity : AppCompatActivity() {
 
 
         countCartItem()
+
+    }
+
+    private fun showNewsDialog() {
+
+        Paper.init(this)
+
+        val builder = androidx.appcompat.app.AlertDialog.Builder(this)
+        builder.setTitle("NUevo Sistema")
+            .setMessage("¿Quieres suscribirte a nuevos envios?")
+        val itemView=LayoutInflater.from(this).inflate(R.layout.layout_subscribe_news,null)
+        builder.setView(itemView)
+        val chk_subscribe = itemView.findViewById<View>(R.id.chk_subscribe_news) as CheckBox
+        val isSubscribeNews = Paper.book().read<Boolean>(Common.IS_SUBSCRIBE_NEWS,false)
+        if (isSubscribeNews) chk_subscribe.isChecked=true
+        builder.setNegativeButton("CANCEL"){dialog: DialogInterface, which: Int -> dialog.dismiss() }
+
+        builder.setPositiveButton("ACEPTAR"){dialog: DialogInterface, which: Int ->
+            if (chk_subscribe.isChecked){
+                Paper.book().write(Common.IS_SUBSCRIBE_NEWS,true)
+                FirebaseMessaging.getInstance().subscribeToTopic(Common.NEWS_TOPIC)
+                    .addOnFailureListener{e->
+                        Toast.makeText(this@HomeActivity,""+e.message,Toast.LENGTH_LONG).show()
+                    }.addOnSuccessListener {aVoid:Void?->
+
+                        Toast.makeText(this@HomeActivity,"Te has suscrito exitosamente!",Toast.LENGTH_LONG).show()
+
+                    }
+            }
+            else{
+
+                Paper.book().delete(Common.IS_SUBSCRIBE_NEWS)
+                FirebaseMessaging.getInstance().unsubscribeFromTopic(Common.NEWS_TOPIC)
+                    .addOnFailureListener{e->
+                        Toast.makeText(this@HomeActivity,""+e.message,Toast.LENGTH_LONG).show()
+                    }.addOnSuccessListener {aVoid:Void?->
+
+                        Toast.makeText(this@HomeActivity,"Te has desuscrito correctamente!",Toast.LENGTH_LONG).show()
+
+                    }
+
+            }
+
+        }
+        val dialog=builder.create()
+        dialog.show()
+
 
     }
 

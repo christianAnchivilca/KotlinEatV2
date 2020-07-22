@@ -10,7 +10,7 @@
 
     <string name="menu_home">Inicio</string>
     <string name="place_order">ORDENAR PEDIDO</string>
-    <string name="clear_cart">Limpiar Todo</string>
+    <string name="clear_cart">BORRAR TODO</string>
     <string name="menu_gallery">Gallery</string>
     <string name="menu_slideshow">Slideshow</string>
     <string name="menu_food_detail">Food Detail</string>
@@ -22,6 +22,7 @@
     <string name="best_deal">Best Deals</string>
     <string name="popular_category">Popular Category</string>
     <string name="menu_category">Categorias</string>
+    <string name="menu_news">Nuevos Envios</string>
     <string name="menu_food_list">Food List</string>
     <string name="size">Tamaño</string>
     <string name="addon">Añadir</string>
