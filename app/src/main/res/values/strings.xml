@@ -32,6 +32,7 @@
     <string name="repeat_order">Repetir Orden</string>
     <string name="google_maps_key" templateMergeStrategy="preserve" translatable="false">AIzaSyCyYEvwwh_LTF4H9zTR1i_XXcUhLLllMKA</string>
     <string name="title_activity_tracking_order">Map</string>
+    <string name="menu_restaurant">Restaurant</string>
 
 
 </resources>

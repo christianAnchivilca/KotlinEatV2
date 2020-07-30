@@ -52,6 +52,7 @@ dependencies {
     //FCM
     implementation 'com.google.firebase:firebase-messaging:20.0.0'
     implementation 'com.google.android.gms:play-services-maps:17.0.0'
+    implementation 'androidx.lifecycle:lifecycle-viewmodel-ktx:2.2.0'
     testImplementation 'junit:junit:4.12'
     androidTestImplementation 'androidx.test.ext:junit:1.1.1'
     androidTestImplementation 'androidx.test.espresso:espresso-core:3.2.0'
@@ -75,26 +76,38 @@ dependencies {
     //libraries
 
     implementation 'com.asksira.android:loopingviewpager:1.1.4'
+    //glide
     implementation 'com.github.bumptech.glide:glide:4.10.0'
     annotationProcessor 'com.github.bumptech.glide:compiler:4.10.0'
+    //circle image
     implementation 'de.hdodenhof:circleimageview:3.0.1'
+    //Green Robot Event
     implementation 'org.greenrobot:eventbus:3.1.1'
+    //Elegant Number count
     implementation 'com.cepheuen.elegant-number-button:lib:1.0.2'
     implementation 'com.github.andremion:counterfab:1.2.0'
+    implementation 'com.github.andremion:counterfab:1.2.2-alpha1'
+    //Room Database
     implementation 'androidx.room:room-rxjava2:2.2.0'
     kapt 'androidx.room:room-compiler:2.2.0'
-    implementation 'com.github.andremion:counterfab:1.2.2-alpha1'
+
+    //Karumi Dexter
     implementation 'com.karumi:dexter:6.0.0'
+    //Google Play Services
     implementation 'com.google.android.gms:play-services-location:17.0.0'
-
+    //Braintree Payment
     implementation 'com.braintreepayments.api:drop-in:4.1.1'
-
+   //ButterKnife
     implementation 'com.jakewharton:butterknife:8.0.1'
     kapt 'com.jakewharton:butterknife-compiler:8.0.1'
 
+    //Google Places
     implementation 'com.google.android.libraries.places:places:2.1.0'
+    //Scala Converter
     implementation 'com.squareup.retrofit2:converter-scalars:2.6.1'
+    //Formated Edittex
     implementation 'com.androidwidgets:formatedittext:0.2.0'
+    //Paper DB
     implementation 'io.paperdb:paperdb:2.6'
 
 

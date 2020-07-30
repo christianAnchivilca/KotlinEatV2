@@ -283,6 +283,7 @@ object Common {
     }
 
     val IMAGE_URL: String="IMAGE_URL"
+    const val RESTAURANT_REFERENCE:String="Restaurant"
     val IS_SEND_IMAGE: String="IS_SEND_IMAGE"
     val NEWS_TOPIC: String="news"
     val IS_SUBSCRIBE_NEWS: String="IS_SUBSCRIBE_NEWS"
