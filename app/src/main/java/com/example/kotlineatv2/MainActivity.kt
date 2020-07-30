@@ -8,6 +8,7 @@ import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
 import android.text.TextUtils
 import android.view.LayoutInflater
+import android.view.View
 import android.widget.EditText
 import android.widget.TextView
 import android.widget.Toast
@@ -24,6 +25,7 @@ import com.google.android.libraries.places.api.model.Place
 import com.google.android.libraries.places.api.net.PlacesClient
 import com.google.android.libraries.places.widget.AutocompleteSupportFragment
 import com.google.android.libraries.places.widget.listener.PlaceSelectionListener
+import com.google.android.material.textfield.TextInputLayout
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.FirebaseUser
 import com.google.firebase.database.*
@@ -38,6 +40,7 @@ import dmax.dialog.SpotsDialog
 import io.reactivex.android.schedulers.AndroidSchedulers
 import io.reactivex.disposables.CompositeDisposable
 import io.reactivex.schedulers.Schedulers
+import org.w3c.dom.Text
 import retrofit2.create
 import java.util.*
 import kotlin.collections.HashMap
@@ -92,7 +95,10 @@ class MainActivity : AppCompatActivity() {
         Places.initialize(this,getString(R.string.google_maps_key))
         placeClient = Places.createClient(this)
 
-        providers = Arrays.asList<AuthUI.IdpConfig>(AuthUI.IdpConfig.PhoneBuilder().build())
+        providers = Arrays.asList<AuthUI.IdpConfig>(
+            AuthUI.IdpConfig.PhoneBuilder().build(),
+            AuthUI.IdpConfig.EmailBuilder().build()
+        )
         iCloudFunctions = RetrofitCloudClient.getInstance().create(ICloudFunctions::class.java)
         //instancia a la data en firebase
         userRef = FirebaseDatabase.getInstance().getReference(Common.USER_REFERENCE)
@@ -149,7 +155,12 @@ class MainActivity : AppCompatActivity() {
 
     private fun phoneLogin(){
 
-        startActivityForResult(AuthUI.getInstance().createSignInIntentBuilder().setAvailableProviders(providers!!).build(),
+        startActivityForResult(AuthUI.getInstance()
+            .createSignInIntentBuilder()
+            .setAvailableProviders(providers!!)
+            .setTheme(R.style.LoginTheme)
+            .setLogo(R.drawable.logo)
+            .build(),
             APP_REQUEST_CODE)
 
     }
@@ -157,7 +168,6 @@ class MainActivity : AppCompatActivity() {
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
         if (requestCode == APP_REQUEST_CODE){
-
             val response = IdpResponse.fromResultIntent(data)
             if(resultCode == Activity.RESULT_OK){
                 val user = FirebaseAuth.getInstance().currentUser
@@ -213,7 +223,9 @@ class MainActivity : AppCompatActivity() {
 
                                 }
 
-                    }else{
+                    }
+                    else
+                    {
                         dialog!!.dismiss()
                         showRegisterDialog(user!!)
 
@@ -233,6 +245,8 @@ class MainActivity : AppCompatActivity() {
 
         val itemView = LayoutInflater.from(this)
             .inflate(R.layout.layout_register,null)
+
+        val phone_input_layout=itemView.findViewById<TextInputLayout>(R.id.phone_input_layout)
         val edt_name = itemView.findViewById<EditText>(R.id.edt_name)
         val edt_phone = itemView.findViewById<EditText>(R.id.edt_phone)
         val txt_address = itemView.findViewById<TextView>(R.id.txt_address_detail)
@@ -255,7 +269,13 @@ class MainActivity : AppCompatActivity() {
         })
 
         //set
-        edt_phone.setText(user!!.phoneNumber)
+        if (user.phoneNumber == null || TextUtils.isEmpty(user.phoneNumber)){
+
+            phone_input_layout.hint="Email"
+            edt_phone.setText(user!!.email!!)
+            edt_name.setText(user!!.displayName)
+        }else
+            edt_phone.setText(user!!.phoneNumber)
 
 
         //Aqui seteamos nuestro formulario de registro dentro del AlertDialogo
@@ -331,12 +351,10 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun goToHomeActivity(userModel: UserModel?,token:String?) {
-
         /*
         * Firebase Instance ID proporciona un identificador único para cada instancia de aplicación y un mecanismo
         * para autenticar y autorizar acciones (por ejemplo, enviar mensajes de FCM)
         * */
-
         FirebaseInstanceId.getInstance()
             .instanceId
             .addOnFailureListener{
@@ -350,21 +368,14 @@ class MainActivity : AppCompatActivity() {
                 task ->
                 if (task.isSuccessful)
                 {
-
                     Common.currentUser = userModel!!
                     Common.currentToken = token!!
-
                     Common.updateToken(this@MainActivity,task.result!!.token)
-
                     startActivity(Intent(this@MainActivity,HomeActivity::class.java))
                     finish()
 
                 }
             }
-
-
-
-
     }
 
 }
